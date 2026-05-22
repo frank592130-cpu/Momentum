@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Momentum",
+    "slug": "momentum",
+    "scheme": "momentum",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "icon": "./assets/assets/icon.png",
+    "splash": {
+      "image": "./assets/assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0C0C0E"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourname.Momentum"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/assets/adaptive-icon.png",
+        "backgroundColor": "#0C0C0E"
+      },
+      "package": "com.yourname.Momentum",
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "POST_NOTIFICATIONS",
+        "VIBRATE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/assets/favicon.png"
+    },
+    "plugins": [
+      "@react-native-firebase/app",
+      "@react-native-firebase/app-check",
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "color": "#7B6EF6",
+          "defaultChannel": "momentum-reminders"
+        }
+      ]
+    ]
+  }
+}

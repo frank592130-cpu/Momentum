@@ -288,27 +288,42 @@ function DifficultySelector({ value, onChange }: { value: GoalDifficulty; onChan
   );
 }
 
-const DAILY_HOURS = Array.from({ length: 16 }, (_, i) => String((i + 1) * 0.5));
+const TARGET_HOURS = Array.from({ length: 25 }, (_, i) => String(i));
+const TARGET_MINUTES = ["00", "15", "30", "45"];
 
 function DailyTargetSelector({ value, onChange }: { value: number; onChange: (value: number) => void }) {
   const { colors, spacing, radius, typography } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, spacing, radius), [colors, spacing, radius]);
-  const closestValue = DAILY_HOURS.reduce((prev, curr) =>
-    Math.abs(Number(curr) - value) < Math.abs(Number(prev) - value) ? curr : prev,
-    DAILY_HOURS[0],
+  
+  const hourValue = Math.floor(value);
+  const minuteValue = Math.round((value - hourValue) * 60);
+  
+  const hourString = String(hourValue);
+  const closestMin = TARGET_MINUTES.reduce((prev, curr) =>
+    Math.abs(Number(curr) - minuteValue) < Math.abs(Number(prev) - minuteValue) ? curr : prev,
+    TARGET_MINUTES[0],
   );
+
   return (
     <View style={styles.dailyTargetWheelPanel}>
       <Text style={typography.micro}>Daily Target</Text>
       <View style={styles.dailyTargetWheelRow}>
         <View pointerEvents="none" style={styles.wheelSelectionBand} />
         <WheelColumn
-          values={DAILY_HOURS}
-          value={closestValue}
-          onChange={(next) => onChange(Number(next))}
+          values={TARGET_HOURS}
+          value={hourString}
+          onChange={(next) => onChange(Number(next) + Number(closestMin) / 60)}
         />
         <View style={styles.dailyTargetUnitWrap}>
-          <Text style={styles.dailyTargetUnit}>hours</Text>
+          <Text style={styles.dailyTargetUnit}>hr</Text>
+        </View>
+        <WheelColumn
+          values={TARGET_MINUTES}
+          value={closestMin}
+          onChange={(next) => onChange(Number(hourString) + Number(next) / 60)}
+        />
+        <View style={styles.dailyTargetUnitWrap}>
+          <Text style={styles.dailyTargetUnit}>min</Text>
         </View>
       </View>
     </View>

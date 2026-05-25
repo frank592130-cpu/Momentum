@@ -17,13 +17,6 @@ interface Props {
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const DAYS = Array.from({ length: 31 }, (_, index) => String(index + 1).padStart(2, "0"));
 const YEARS = Array.from({ length: 9 }, (_, index) => String(new Date().getFullYear() - 1 + index));
-const DIFFICULTY_OPTIONS: GoalDifficulty[] = ["easy", "standard", "hard", "extreme"];
-const DIFFICULTY_LABELS: Record<GoalDifficulty, string> = {
-  easy: "Easy",
-  standard: "Standard",
-  hard: "Hard",
-  extreme: "Extreme",
-};
 
 export function GoalsScreen({ onGoalPress }: Props) {
   const { colors, spacing, radius, typography } = useAppTheme();
@@ -235,10 +228,6 @@ function GoalEditorModal({
               value={draft.category}
               onChange={(category) => onChange((prev) => ({ ...prev, category }))}
             />
-            <DifficultySelector
-              value={draft.difficulty}
-              onChange={(difficulty) => onChange((prev) => ({ ...prev, difficulty }))}
-            />
             <DailyTargetSelector
               value={draft.dailyGoalHours}
               onChange={(dailyGoalHours) => onChange((prev) => ({ ...prev, dailyGoalHours }))}
@@ -263,28 +252,6 @@ function GoalEditorModal({
         </MotionPanel>
       </View>
     </Modal>
-  );
-}
-
-function DifficultySelector({ value, onChange }: { value: GoalDifficulty; onChange: (value: GoalDifficulty) => void }) {
-  const { colors, spacing, radius, typography } = useAppTheme();
-  const styles = useMemo(() => createStyles(colors, spacing, radius), [colors, spacing, radius]);
-  return (
-    <View style={styles.categoryGroup}>
-      <Text style={typography.micro}>Difficulty</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
-        {DIFFICULTY_OPTIONS.map((option) => {
-          const active = option === value;
-          return (
-            <TouchableOpacity key={option} onPress={() => onChange(option)} style={[styles.categoryChip, active && styles.categoryChipActive]}>
-              <Text style={[styles.categoryText, active && styles.categoryTextActive]} numberOfLines={1}>
-                {DIFFICULTY_LABELS[option]}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-    </View>
   );
 }
 
@@ -429,7 +396,7 @@ function GoalRow({
         <View style={styles.goalTop}>
           <View style={styles.goalTopLeft}>
             <Text style={[typography.label, styles.goalCat]}>
-              {goal.category.toUpperCase()} / {DIFFICULTY_LABELS[goal.difficulty].toUpperCase()}
+              {goal.category.toUpperCase()}
             </Text>
             <Text style={styles.goalTitle}>{goal.title}</Text>
           </View>

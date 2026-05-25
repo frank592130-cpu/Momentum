@@ -6,6 +6,8 @@ export type RiskLevel = "low" | "medium" | "high";
 export type ThemePreference = "system" | "light" | "dark";
 export type GoalDifficulty = "easy" | "standard" | "hard" | "extreme";
 export type GoalProgressSource = "manual" | "tasks";
+export type AnalyticsInsightSeverity = "positive" | "neutral" | "warning";
+export type AnalyticsInsightType = "capacity" | "balance" | "streak" | "velocity";
 
 export interface Goal {
   id: string;
@@ -14,6 +16,7 @@ export interface Goal {
   difficulty: GoalDifficulty;
   startDate: ISODateString;
   deadline: ISODateString;
+  dailyGoalHours: number;
   progress: number;
   createdAt: ISODateTimeString;
   updatedAt: ISODateTimeString;
@@ -29,7 +32,7 @@ export interface Task {
   focusMinutes: number;
   done: boolean;
   energy: EnergyLevel;
-  goalId?: string;
+  goalIds: string[];
   completedAt?: ISODateTimeString;
   createdAt: ISODateTimeString;
   updatedAt: ISODateTimeString;
@@ -43,13 +46,13 @@ export interface AppSettings {
   aiInsights: boolean;
   riskAlerts: boolean;
   weeklyReport: boolean;
-  dailyGoalHours: number;
+  globalDailyGoalHours: number;
   workHoursStart: string;
   workHoursEnd: string;
 }
 
 export interface AppData {
-  schemaVersion: 1;
+  schemaVersion: 2;
   goals: Goal[];
   tasks: Task[];
   settings: AppSettings;
@@ -66,9 +69,10 @@ export interface GoalMetrics extends Goal {
   momentumScore: number;
   completionRate: number;
   trendScore: number;
-  successRate: number;
+  healthScore: number;
   risk: RiskLevel;
   weeklyHours: number[];
+  dailyTargetHours: number;
   linkedTaskCount: number;
   completedLinkedTaskCount: number;
   plannedLinkedMinutes: number;
@@ -83,15 +87,32 @@ export interface WorkloadSlice {
   minutes: number;
 }
 
-export interface AnalyticsData {
-  successTrend: number[];
-  weeklyCompletion: number[];
-  focusHours: number[];
-  workloadDist: WorkloadSlice[];
-  avgGoalSuccessRate: number;
-  weeklyCompletionRate: number;
-  avgDailyFocusHours: number;
-  activeDays30: number;
-  streakDays: number;
-  bestWeekLabel: string;
+export interface GoalProgress {
+  goalId: string;
+  currentStreak: number;
+  longestStreak: number;
+  streakStartDate?: ISODateString;
+  weeklyProgress: number;
+  weeklyTarget: number;
+  velocityTrend: number;
 }
+
+export interface AnalyticsInsight {
+  type: AnalyticsInsightType;
+  title: string;
+  body: string;
+  icon: string;
+  severity: AnalyticsInsightSeverity;
+}
+
+export interface EnhancedAnalyticsData {
+  goalProgressMap: Record<string, GoalProgress>;
+  overallWeeklyCompletion: number[];
+  overallFocusHours: number[];
+  insights: AnalyticsInsight[];
+  activeDays30: number;
+  totalStreakDays: number;
+  goalBalanceScore: number;
+}
+
+export type AnalyticsData = EnhancedAnalyticsData;

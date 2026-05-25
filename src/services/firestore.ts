@@ -13,9 +13,10 @@ import {
   writeBatch,
   collection,
   Unsubscribe,
+  type FieldValue,
 } from "firebase/firestore";
 import { AppData, AppSettings, EnergyLevel, Goal, GoalDifficulty, Task, ThemePreference } from "../domain/models";
-import { calculateGoalMetrics, normalizeGoalDifficulty } from "../domain/stats";
+import { normalizeDailyGoalHours, normalizeGoalDifficulty } from "../domain/stats";
 import { createInitialAppData } from "../data/initialData";
 import { AuthUser, toAuthUser } from "./auth";
 import { firebaseCollections, getFirebaseFirestore } from "./firebase";
@@ -32,7 +33,8 @@ interface FirestoreUserDocument {
   aiInsights?: boolean;
   riskAlerts?: boolean;
   weeklyReport?: boolean;
-  dailyGoalHours?: number;
+  globalDailyGoalHours?: number;
+  dailyGoalHours?: number | FieldValue;
   workHoursStart?: string;
   workHoursEnd?: string;
 }
@@ -49,7 +51,8 @@ interface FirestoreTaskDocument {
   duration?: number;
   focusMinutes?: number;
   energy?: EnergyLevel;
-  goalId?: string;
+  goalIds?: string[];
+  goalId?: string | FieldValue;
   updatedAt?: string;
 }
 
@@ -57,12 +60,12 @@ interface FirestoreGoalDocument {
   title?: string;
   targetDate?: string;
   progress?: number;
-  successRate?: number;
   createdAt?: string;
   category?: string;
   difficulty?: GoalDifficulty;
   startDate?: string;
   deadline?: string;
+  dailyGoalHours?: number;
   updatedAt?: string;
 }
 
@@ -98,6 +101,12 @@ function normalizeThemePreference(value: unknown, darkMode: unknown): ThemePrefe
   return darkMode === false ? "light" : "dark";
 }
 
+function normalizeGoalIds(goalIds: unknown, legacyGoalId?: unknown) {
+  const next = Array.isArray(goalIds) ? goalIds.filter((id): id is string => typeof id === "string" && id.length > 0) : [];
+  if (typeof legacyGoalId === "string" && legacyGoalId.length > 0) next.push(legacyGoalId);
+  return Array.from(new Set(next));
+}
+
 function fromUserDocument(id: string, document: FirestoreUserDocument | undefined): FirestoreUserData["profile"] {
   if (!document) return null;
   return {
@@ -108,6 +117,7 @@ function fromUserDocument(id: string, document: FirestoreUserDocument | undefine
 }
 
 function settingsFromUserDocument(document: FirestoreUserDocument | undefined): AppSettings {
+  const legacyDailyGoalHours = typeof document?.dailyGoalHours === "number" ? document.dailyGoalHours : undefined;
   return {
     ...defaultData.settings,
     themePreference: normalizeThemePreference(document?.themePreference, document?.darkMode),
@@ -117,7 +127,7 @@ function settingsFromUserDocument(document: FirestoreUserDocument | undefined): 
     aiInsights: document?.aiInsights ?? defaultData.settings.aiInsights,
     riskAlerts: document?.riskAlerts ?? defaultData.settings.riskAlerts,
     weeklyReport: document?.weeklyReport ?? defaultData.settings.weeklyReport,
-    dailyGoalHours: document?.dailyGoalHours ?? defaultData.settings.dailyGoalHours,
+    globalDailyGoalHours: normalizeDailyGoalHours(document?.globalDailyGoalHours ?? legacyDailyGoalHours, defaultData.settings.globalDailyGoalHours),
     workHoursStart: document?.workHoursStart ?? defaultData.settings.workHoursStart,
     workHoursEnd: document?.workHoursEnd ?? defaultData.settings.workHoursEnd,
   };
@@ -127,6 +137,7 @@ function fromTaskDocument(id: string, document: FirestoreTaskDocument): Task {
   const timestamp = new Date().toISOString();
   const duration = document.duration ?? 30;
   const energy = document.energy ?? document.priority ?? "medium";
+  const legacyGoalId = typeof document.goalId === "string" ? document.goalId : undefined;
   return {
     id,
     title: document.title ?? "Untitled task",
@@ -137,7 +148,7 @@ function fromTaskDocument(id: string, document: FirestoreTaskDocument): Task {
     focusMinutes: document.focusMinutes ?? duration,
     done: document.completed ?? false,
     energy,
-    goalId: document.goalId,
+    goalIds: normalizeGoalIds(document.goalIds, legacyGoalId),
     completedAt: document.completedAt ?? undefined,
     createdAt: document.createdAt ?? timestamp,
     updatedAt: document.updatedAt ?? document.createdAt ?? timestamp,
@@ -157,7 +168,8 @@ function toTaskDocument(task: Task): FirestoreTaskDocument {
     duration: task.duration,
     focusMinutes: task.focusMinutes,
     energy: task.energy,
-    goalId: task.goalId,
+    goalIds: task.goalIds,
+    goalId: deleteField(),
     updatedAt: task.updatedAt,
   };
 }
@@ -172,6 +184,7 @@ function fromGoalDocument(id: string, document: FirestoreGoalDocument): Goal {
     difficulty: normalizeGoalDifficulty(document.difficulty),
     startDate: document.startDate ?? new Date().toISOString().slice(0, 10),
     deadline,
+    dailyGoalHours: normalizeDailyGoalHours(document.dailyGoalHours, defaultData.settings.globalDailyGoalHours),
     progress: document.progress ?? 0,
     createdAt: document.createdAt ?? timestamp,
     updatedAt: document.updatedAt ?? document.createdAt ?? timestamp,
@@ -183,12 +196,12 @@ function toGoalDocument(goal: Goal, tasks: Task[] = []): FirestoreGoalDocument {
     title: goal.title,
     targetDate: goal.deadline,
     progress: goal.progress,
-    successRate: calculateGoalMetrics(goal, tasks).successRate,
     createdAt: goal.createdAt,
     category: goal.category,
     difficulty: normalizeGoalDifficulty(goal.difficulty),
     startDate: goal.startDate,
     deadline: goal.deadline,
+    dailyGoalHours: normalizeDailyGoalHours(goal.dailyGoalHours),
     updatedAt: goal.updatedAt,
   };
 }
@@ -203,7 +216,8 @@ function toUserSettingsDocument(settings: AppSettings): Partial<FirestoreUserDoc
     aiInsights: settings.aiInsights,
     riskAlerts: settings.riskAlerts,
     weeklyReport: settings.weeklyReport,
-    dailyGoalHours: settings.dailyGoalHours,
+    globalDailyGoalHours: settings.globalDailyGoalHours,
+    dailyGoalHours: deleteField(),
     workHoursStart: settings.workHoursStart,
     workHoursEnd: settings.workHoursEnd,
   };
@@ -243,7 +257,7 @@ export function subscribeToUserData(
     onData({
       profile,
       data: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         settings,
         tasks,
         goals,
@@ -306,9 +320,18 @@ export async function removeGoal(userId: string, goalId: string) {
   const db = getFirebaseFirestore();
   const batch = writeBatch(db);
   batch.delete(goalRef(userId, goalId));
-  const linkedTasks = await getDocs(query(taskCollectionRef(userId), where("goalId", "==", goalId)));
-  linkedTasks.docs.forEach((taskDoc) => {
-    batch.update(taskDoc.ref, { goalId: deleteField(), updatedAt: new Date().toISOString() });
+  const [linkedTasks, legacyLinkedTasks] = await Promise.all([
+    getDocs(query(taskCollectionRef(userId), where("goalIds", "array-contains", goalId))),
+    getDocs(query(taskCollectionRef(userId), where("goalId", "==", goalId))),
+  ]);
+  const linkedTaskDocs = new Map([...linkedTasks.docs, ...legacyLinkedTasks.docs].map((taskDoc) => [taskDoc.id, taskDoc]));
+  linkedTaskDocs.forEach((taskDoc) => {
+    const task = fromTaskDocument(taskDoc.id, taskDoc.data() as FirestoreTaskDocument);
+    batch.update(taskDoc.ref, {
+      goalIds: task.goalIds.filter((linkedGoalId) => linkedGoalId !== goalId),
+      goalId: deleteField(),
+      updatedAt: new Date().toISOString(),
+    });
   });
   await batch.commit();
 }

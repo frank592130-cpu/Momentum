@@ -38,12 +38,13 @@ export function GoalsScreen({ onGoalPress }: Props) {
     difficulty: "standard" as GoalDifficulty,
     startDate: today,
     deadline: addDays(today, 30),
+    dailyGoalHours: data.settings.globalDailyGoalHours,
   });
   const [formError, setFormError] = useState("");
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [editingGoalId, setEditingGoalId] = useState<string | undefined>();
 
-  const avgSuccess = goals.length ? Math.round(goals.reduce((sum, goal) => sum + goal.successRate, 0) / goals.length) : 0;
+  const avgHealth = goals.length ? Math.round(goals.reduce((sum, goal) => sum + goal.healthScore, 0) / goals.length) : 0;
   const onTrack = goals.filter((goal) => goal.risk === "low").length;
   const atRisk = goals.filter((goal) => goal.risk === "high").length;
   const categoryOptions = useMemo(() => {
@@ -52,7 +53,14 @@ export function GoalsScreen({ onGoalPress }: Props) {
   }, [data.goals]);
 
   const resetGoalForm = () => {
-    setDraft({ title: "", category: categoryOptions[0] ?? "Personal", difficulty: "standard", startDate: today, deadline: addDays(today, 30) });
+    setDraft({
+      title: "",
+      category: categoryOptions[0] ?? "Personal",
+      difficulty: "standard",
+      startDate: today,
+      deadline: addDays(today, 30),
+      dailyGoalHours: data.settings.globalDailyGoalHours,
+    });
     setEditingGoalId(undefined);
     setFormError("");
     setShowGoalForm(false);
@@ -69,6 +77,7 @@ export function GoalsScreen({ onGoalPress }: Props) {
       difficulty: draft.difficulty,
       startDate: draft.startDate,
       deadline: draft.deadline,
+      dailyGoalHours: draft.dailyGoalHours,
       progress: editingGoalId ? data.goals.find((goal) => goal.id === editingGoalId)?.progress ?? 0 : 0,
     };
     if (editingGoalId) {
@@ -88,11 +97,11 @@ export function GoalsScreen({ onGoalPress }: Props) {
       </View>
 
       <View style={styles.summaryCard}>
-        <ProgressRing size={88} progress={avgSuccess} color={colors.accent} strokeWidth={7}>
-          <Text style={styles.ringVal}>{avgSuccess}%</Text>
+        <ProgressRing size={88} progress={avgHealth} color={colors.accent} strokeWidth={7}>
+          <Text style={styles.ringVal}>{avgHealth}%</Text>
         </ProgressRing>
         <View style={styles.ringRight}>
-          <Text style={typography.titleSmall}>Overall Success Rate</Text>
+          <Text style={typography.titleSmall}>Overall Goal Health</Text>
           <View style={styles.statsRow}>
             <Metric label="On Track" value={`${onTrack}`} color={colors.success} />
             <View style={styles.statDivider} />
@@ -191,11 +200,13 @@ function GoalEditorModal({
 }: {
   visible: boolean;
   title: string;
-  draft: { title: string; category: string; difficulty: GoalDifficulty; startDate: string; deadline: string };
+  draft: { title: string; category: string; difficulty: GoalDifficulty; startDate: string; deadline: string; dailyGoalHours: number };
   categoryOptions: string[];
   error: string;
   onClose: () => void;
-  onChange: React.Dispatch<React.SetStateAction<{ title: string; category: string; difficulty: GoalDifficulty; startDate: string; deadline: string }>>;
+  onChange: React.Dispatch<
+    React.SetStateAction<{ title: string; category: string; difficulty: GoalDifficulty; startDate: string; deadline: string; dailyGoalHours: number }>
+  >;
   onSave: () => void;
   onDelete?: () => void;
 }) {
@@ -227,6 +238,10 @@ function GoalEditorModal({
             <DifficultySelector
               value={draft.difficulty}
               onChange={(difficulty) => onChange((prev) => ({ ...prev, difficulty }))}
+            />
+            <DailyTargetSelector
+              value={draft.dailyGoalHours}
+              onChange={(dailyGoalHours) => onChange((prev) => ({ ...prev, dailyGoalHours }))}
             />
             <DatePeriodWheel
               startDate={draft.startDate}
@@ -269,6 +284,40 @@ function DifficultySelector({ value, onChange }: { value: GoalDifficulty; onChan
           );
         })}
       </ScrollView>
+    </View>
+  );
+}
+
+function DailyTargetSelector({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+  const { colors, spacing, radius, typography } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, spacing, radius), [colors, spacing, radius]);
+  const options = [0.5, 1, 2, 3, 4];
+  return (
+    <View style={styles.categoryGroup}>
+      <Text style={typography.micro}>Daily Target</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
+        {options.map((option) => {
+          const active = value === option;
+          return (
+            <TouchableOpacity key={option} onPress={() => onChange(option)} style={[styles.categoryChip, active && styles.categoryChipActive]}>
+              <Text style={[styles.categoryText, active && styles.categoryTextActive]} numberOfLines={1}>
+                {option}h
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+      <TextInput
+        value={String(value)}
+        onChangeText={(nextValue) => {
+          const parsed = Number(nextValue);
+          onChange(Number.isFinite(parsed) ? parsed : value);
+        }}
+        keyboardType="decimal-pad"
+        placeholder="Hours per day"
+        placeholderTextColor={colors.textTertiary}
+        style={styles.input}
+      />
     </View>
   );
 }
@@ -390,12 +439,12 @@ function GoalRow({
         <View style={styles.goalBottom}>
           <View style={styles.goalMetrics}>
             <View>
-              <Text style={typography.micro}>Success</Text>
-              <Text style={[styles.metaVal, { color: goal.risk === "high" ? colors.danger : colors.textPrimary }]}>{goal.successRate}%</Text>
+              <Text style={typography.micro}>Health</Text>
+              <Text style={[styles.metaVal, { color: goal.risk === "high" ? colors.danger : colors.textPrimary }]}>{goal.healthScore}%</Text>
             </View>
             <View>
-              <Text style={typography.micro}>Days Left</Text>
-              <Text style={styles.metaVal}>{goal.daysLeft}</Text>
+              <Text style={typography.micro}>Daily</Text>
+              <Text style={styles.metaVal}>{goal.dailyTargetHours}h</Text>
             </View>
             <View>
               <Text style={typography.micro}>Linked</Text>

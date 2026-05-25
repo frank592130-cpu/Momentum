@@ -2,7 +2,7 @@ import { AppData } from "../domain/models";
 
 export function createInitialAppData(): AppData {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     goals: [],
     tasks: [],
     settings: {
@@ -13,7 +13,7 @@ export function createInitialAppData(): AppData {
       aiInsights: true,
       riskAlerts: true,
       weeklyReport: false,
-      dailyGoalHours: 8.5,
+      globalDailyGoalHours: 8.5,
       workHoursStart: "09:00",
       workHoursEnd: "18:00",
     },

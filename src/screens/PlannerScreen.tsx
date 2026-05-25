@@ -35,7 +35,7 @@ export function PlannerScreen() {
     time: "09:00",
     endTime: "09:30",
     tag: "Focus",
-    goalId: data.goals[0]?.id ?? "",
+    goalIds: [] as string[],
   });
   const [formError, setFormError] = useState("");
   const [showTaskForm, setShowTaskForm] = useState(false);
@@ -51,7 +51,7 @@ export function PlannerScreen() {
         !query ||
         task.title.toLowerCase().includes(query) ||
         task.tag.toLowerCase().includes(query) ||
-        (task.goalId ? goalTitleById[task.goalId]?.toLowerCase().includes(query) : false);
+        task.goalIds.some((goalId) => goalTitleById[goalId]?.toLowerCase().includes(query));
       return matchesFilter && matchesQuery;
     });
   }, [filter, goalTitleById, search, tasks]);
@@ -69,7 +69,7 @@ export function PlannerScreen() {
   }, [data.tasks]);
 
   const resetTaskForm = () => {
-    setDraft({ title: "", time: "09:00", endTime: "09:30", tag: tagOptions[0] ?? "Focus", goalId: data.goals[0]?.id ?? "" });
+    setDraft({ title: "", time: "09:00", endTime: "09:30", tag: tagOptions[0] ?? "Focus", goalIds: [] });
     setEditingTaskId(undefined);
     setFormError("");
     setShowTaskForm(false);
@@ -92,7 +92,7 @@ export function PlannerScreen() {
       time: draft.time,
       duration,
       energy: "medium" as const,
-      goalId: draft.goalId || undefined,
+      goalIds: draft.goalIds,
     };
     if (editingTaskId) {
       actions.updateTask(editingTaskId, input);
@@ -108,7 +108,7 @@ export function PlannerScreen() {
       time: task.time,
       endTime: addMinutesToTime(task.time, task.duration),
       tag: task.tag,
-      goalId: task.goalId ?? "",
+      goalIds: task.goalIds,
     });
     setEditingTaskId(task.id);
     setFormError("");
@@ -200,7 +200,7 @@ export function PlannerScreen() {
               key={task.id}
               task={task}
               isLast={index === visibleTasks.length - 1}
-              goalTitle={task.goalId ? goalTitleById[task.goalId] : undefined}
+              goalTitles={task.goalIds.map((goalId) => goalTitleById[goalId]).filter(Boolean)}
               onToggle={actions.toggleTask}
               onEdit={editTask}
             />
@@ -328,12 +328,12 @@ function TaskEditorModal({
 }: {
   visible: boolean;
   title: string;
-  draft: { title: string; time: string; endTime: string; tag: string; goalId: string };
+  draft: { title: string; time: string; endTime: string; tag: string; goalIds: string[] };
   goals: Array<{ id: string; title: string }>;
   tagOptions: string[];
   error: string;
   onClose: () => void;
-  onChange: React.Dispatch<React.SetStateAction<{ title: string; time: string; endTime: string; tag: string; goalId: string }>>;
+  onChange: React.Dispatch<React.SetStateAction<{ title: string; time: string; endTime: string; tag: string; goalIds: string[] }>>;
   onSave: () => void;
   onDelete?: () => void;
 }) {
@@ -367,12 +367,10 @@ function TaskEditorModal({
               value={draft.tag}
               onChange={(tag) => onChange((prev) => ({ ...prev, tag }))}
             />
-            <Segmented
-              options={["", ...goals.map((goal) => goal.id)]}
-              labels={{ "": "No Goal", ...Object.fromEntries(goals.map((goal) => [goal.id, goal.title])) }}
-              value={draft.goalId}
-              onChange={(goalId) => onChange((prev) => ({ ...prev, goalId }))}
-              label="Goal"
+            <MultiGoalSelector
+              goals={goals}
+              value={draft.goalIds}
+              onChange={(goalIds) => onChange((prev) => ({ ...prev, goalIds }))}
             />
             {error ? <Text style={styles.formError}>{error}</Text> : null}
             <View style={styles.modalActions}>
@@ -507,35 +505,39 @@ function getTagColor(label: string) {
   return palette[hash % palette.length];
 }
 
-function Segmented<T extends string>({
-  options,
+function MultiGoalSelector({
+  goals,
   value,
   onChange,
-  label,
-  labels,
 }: {
-  options: T[];
-  value: T;
-  onChange: (value: T) => void;
-  label: string;
-  labels?: Record<string, string>;
+  goals: Array<{ id: string; title: string }>;
+  value: string[];
+  onChange: (value: string[]) => void;
 }) {
   const { colors, spacing, radius, typography } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, spacing, radius), [colors, spacing, radius]);
+  const toggleGoal = (goalId: string) => {
+    onChange(value.includes(goalId) ? value.filter((id) => id !== goalId) : [...value, goalId]);
+  };
+
   return (
     <View style={styles.segmentGroup}>
-      <Text style={typography.micro}>{label}</Text>
+      <Text style={typography.micro}>Goals</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.segmentRow}>
-        {options.map((option) => {
-          const active = option === value;
+        <TouchableOpacity
+          onPress={() => onChange([])}
+          style={[styles.segmentButton, value.length === 0 && styles.segmentButtonActive]}
+        >
+          <Text style={[styles.segmentText, value.length === 0 && styles.segmentTextActive]} numberOfLines={1}>
+            No Goal
+          </Text>
+        </TouchableOpacity>
+        {goals.map((goal) => {
+          const active = value.includes(goal.id);
           return (
-            <TouchableOpacity
-              key={option || "none"}
-              onPress={() => onChange(option)}
-              style={[styles.segmentButton, active && styles.segmentButtonActive]}
-            >
+            <TouchableOpacity key={goal.id} onPress={() => toggleGoal(goal.id)} style={[styles.segmentButton, active && styles.segmentButtonActive]}>
               <Text style={[styles.segmentText, active && styles.segmentTextActive]} numberOfLines={1}>
-                {labels?.[option] ?? option}
+                {goal.title}
               </Text>
             </TouchableOpacity>
           );
@@ -556,16 +558,34 @@ function TagSelector({
 }) {
   const { colors, spacing, radius, typography } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, spacing, radius), [colors, spacing, radius]);
+  const [isAddingCustom, setIsAddingCustom] = useState(false);
+  const [customTag, setCustomTag] = useState("");
+  const displayOptions = useMemo(() => {
+    const selectedTag = value.trim();
+    return Array.from(new Set([...options, ...(selectedTag ? [selectedTag] : [])]));
+  }, [options, value]);
+  const commitCustomTag = () => {
+    const nextTag = customTag.trim();
+    if (!nextTag) return;
+    onChange(nextTag);
+    setCustomTag("");
+    setIsAddingCustom(false);
+  };
+
   return (
     <View style={styles.segmentGroup}>
       <Text style={typography.micro}>Tag</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.segmentRow}>
-        {options.map((option) => {
+        {displayOptions.map((option) => {
           const active = option === value;
           return (
             <TouchableOpacity
               key={option}
-              onPress={() => onChange(option)}
+              onPress={() => {
+                onChange(option);
+                setIsAddingCustom(false);
+                setCustomTag("");
+              }}
               style={[styles.segmentButton, active && styles.segmentButtonActive]}
             >
               <Text style={[styles.segmentText, active && styles.segmentTextActive]} numberOfLines={1}>
@@ -574,14 +594,48 @@ function TagSelector({
             </TouchableOpacity>
           );
         })}
+        <TouchableOpacity
+          onPress={() => setIsAddingCustom(true)}
+          style={[styles.addTagButton, isAddingCustom && styles.addTagButtonActive]}
+          activeOpacity={0.75}
+          accessibilityLabel="Add custom tag"
+        >
+          <Text style={styles.addTagButtonText}>+</Text>
+        </TouchableOpacity>
       </ScrollView>
-      <TextInput
-        value={value}
-        onChangeText={onChange}
-        placeholder="Create custom tag"
-        placeholderTextColor={colors.textTertiary}
-        style={styles.input}
-      />
+      {isAddingCustom ? (
+        <View style={styles.customTagRow}>
+          <TextInput
+            value={customTag}
+            onChangeText={setCustomTag}
+            onSubmitEditing={commitCustomTag}
+            placeholder="New tag"
+            placeholderTextColor={colors.textTertiary}
+            style={[styles.input, styles.customTagInput]}
+            autoFocus
+            returnKeyType="done"
+          />
+          <TouchableOpacity
+            onPress={commitCustomTag}
+            style={[styles.customTagActionButton, styles.customTagConfirmButton]}
+            activeOpacity={0.75}
+            accessibilityLabel="Save custom tag"
+          >
+            <Text style={[styles.customTagActionText, styles.customTagConfirmText]}>+</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              setCustomTag("");
+              setIsAddingCustom(false);
+            }}
+            style={styles.customTagActionButton}
+            activeOpacity={0.75}
+            accessibilityLabel="Cancel custom tag"
+          >
+            <Text style={styles.customTagActionText}>x</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -791,6 +845,43 @@ function createStyles(colors: ThemeColors, spacingValue: typeof import("../theme
     },
     segmentText: { color: colors.textSecondary, fontSize: 12, fontWeight: "700" },
     segmentTextActive: { color: colors.accent },
+    addTagButton: {
+      width: 38,
+      minHeight: 34,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: radiusValue.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.bgElevated,
+    },
+    addTagButtonActive: {
+      borderColor: colors.accent,
+      backgroundColor: colors.accentSubtle,
+    },
+    addTagButtonText: { color: colors.accent, fontSize: 20, fontWeight: "800", lineHeight: 20 },
+    customTagRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacingValue.sm,
+    },
+    customTagInput: { flex: 1 },
+    customTagActionButton: {
+      width: 42,
+      minHeight: 42,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: radiusValue.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.bgElevated,
+    },
+    customTagConfirmButton: {
+      borderColor: colors.accent,
+      backgroundColor: colors.accentSubtle,
+    },
+    customTagActionText: { color: colors.textSecondary, fontSize: 16, fontWeight: "800", lineHeight: 18 },
+    customTagConfirmText: { color: colors.accent, fontSize: 20, lineHeight: 20 },
     workloadCard: {
       backgroundColor: colors.bgCard,
       borderWidth: 1,

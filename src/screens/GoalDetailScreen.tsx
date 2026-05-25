@@ -41,16 +41,30 @@ export function GoalDetailScreen({ goalId, onBack }: Props) {
   const storedGoal = useMemo(() => data.goals.find((item) => item.id === goalId), [data.goals, goalId]);
   const goal = useMemo(() => enrichGoals(data.goals, data.tasks, today).find((item) => item.id === goalId), [data.goals, data.tasks, goalId, today]);
   const [showEditor, setShowEditor] = useState(false);
-  const [draft, setDraft] = useState({ title: "", category: "Personal", difficulty: "standard" as GoalDifficulty, startDate: today, deadline: addDays(today, 30) });
+  const [draft, setDraft] = useState({
+    title: "",
+    category: "Personal",
+    difficulty: "standard" as GoalDifficulty,
+    startDate: today,
+    deadline: addDays(today, 30),
+    dailyGoalHours: data.settings.globalDailyGoalHours,
+  });
   const [formError, setFormError] = useState("");
   const linkedTasks = useMemo(
-    () => data.tasks.filter((task) => task.goalId === goalId).slice().sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time)),
+    () => data.tasks.filter((task) => task.goalIds.includes(goalId)).slice().sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time)),
     [data.tasks, goalId],
   );
 
   useEffect(() => {
     if (!goal) return;
-    setDraft({ title: goal.title, category: goal.category, difficulty: goal.difficulty, startDate: goal.startDate, deadline: goal.deadline });
+    setDraft({
+      title: goal.title,
+      category: goal.category,
+      difficulty: goal.difficulty,
+      startDate: goal.startDate,
+      deadline: goal.deadline,
+      dailyGoalHours: goal.dailyTargetHours,
+    });
   }, [goal]);
 
   if (!goal) {
@@ -78,9 +92,9 @@ export function GoalDetailScreen({ goalId, onBack }: Props) {
   };
 
   const metrics = [
-    { label: "Success Rate", value: `${goal.successRate}%`, color: riskColor },
+    { label: "Goal Health", value: `${goal.healthScore}%`, color: riskColor },
+    { label: "Daily Target", value: `${goal.dailyTargetHours}h`, color: colors.textPrimary },
     { label: "Days Left", value: `${goal.daysLeft}`, color: colors.textPrimary },
-    { label: "Expected", value: `${goal.expectedProgress}%`, color: colors.textPrimary },
     { label: "Linked Tasks", value: `${completedLinked}/${linkedTasks.length}`, color: colors.textPrimary },
   ];
 
@@ -164,7 +178,7 @@ export function GoalDetailScreen({ goalId, onBack }: Props) {
       </View>
 
       <View style={styles.card}>
-        <SectionHeader title="Success Formula" subtitle="Prediction" />
+        <SectionHeader title="Health Formula" subtitle="Signals" />
         <View style={styles.formulaList}>
           {formulaRows.map((row) => (
             <View key={row.label}>
@@ -250,11 +264,13 @@ function GoalEditorModal({
   onSave,
 }: {
   visible: boolean;
-  draft: { title: string; category: string; difficulty: GoalDifficulty; startDate: string; deadline: string };
+  draft: { title: string; category: string; difficulty: GoalDifficulty; startDate: string; deadline: string; dailyGoalHours: number };
   categoryOptions: string[];
   error: string;
   onClose: () => void;
-  onChange: React.Dispatch<React.SetStateAction<{ title: string; category: string; difficulty: GoalDifficulty; startDate: string; deadline: string }>>;
+  onChange: React.Dispatch<
+    React.SetStateAction<{ title: string; category: string; difficulty: GoalDifficulty; startDate: string; deadline: string; dailyGoalHours: number }>
+  >;
   onSave: () => void;
 }) {
   const { colors, spacing, radius } = useAppTheme();
@@ -279,6 +295,7 @@ function GoalEditorModal({
             />
             <CategorySelector options={categoryOptions} value={draft.category} onChange={(category) => onChange((prev) => ({ ...prev, category }))} />
             <DifficultySelector value={draft.difficulty} onChange={(difficulty) => onChange((prev) => ({ ...prev, difficulty }))} />
+            <DailyTargetSelector value={draft.dailyGoalHours} onChange={(dailyGoalHours) => onChange((prev) => ({ ...prev, dailyGoalHours }))} />
             <DatePeriodWheel
               startDate={draft.startDate}
               endDate={draft.deadline}
@@ -313,6 +330,40 @@ function DifficultySelector({ value, onChange }: { value: GoalDifficulty; onChan
           );
         })}
       </ScrollView>
+    </View>
+  );
+}
+
+function DailyTargetSelector({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+  const { colors, spacing, radius, typography } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors, spacing, radius), [colors, spacing, radius]);
+  const options = [0.5, 1, 2, 3, 4];
+  return (
+    <View style={styles.categoryGroup}>
+      <Text style={typography.micro}>Daily Target</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
+        {options.map((option) => {
+          const active = value === option;
+          return (
+            <TouchableOpacity key={option} onPress={() => onChange(option)} style={[styles.categoryChip, active && styles.categoryChipActive]}>
+              <Text style={[styles.categoryText, active && styles.categoryTextActive]} numberOfLines={1}>
+                {option}h
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+      <TextInput
+        value={String(value)}
+        onChangeText={(nextValue) => {
+          const parsed = Number(nextValue);
+          onChange(Number.isFinite(parsed) ? parsed : value);
+        }}
+        keyboardType="decimal-pad"
+        placeholder="Hours per day"
+        placeholderTextColor={colors.textTertiary}
+        style={styles.input}
+      />
     </View>
   );
 }

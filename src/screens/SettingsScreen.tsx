@@ -121,7 +121,7 @@ export function SettingsScreen() {
         <View style={styles.group}>
           <InfoRow title="Work Hours" subtitle={`${settings.workHoursStart} - ${settings.workHoursEnd}`} />
           <View style={styles.divider} />
-          <InfoRow title="Daily Goal Hours" subtitle={`${settings.dailyGoalHours} hours target`} />
+          <InfoRow title="Default Goal Hours" subtitle={`${settings.globalDailyGoalHours} hours for new goals`} />
           <View style={styles.divider} />
           <InfoRow title="Storage" subtitle="Cloud Firestore sync enabled" />
         </View>

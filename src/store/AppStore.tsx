@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useEffect, useMemo, useReducer } fro
 import { createInitialAppData } from "../data/initialData";
 import { addDays, isValidDateKey, toDateKey } from "../domain/date";
 import { AppData, AppSettings, EnergyLevel, Goal, GoalDifficulty, Task, ThemePreference } from "../domain/models";
-import { normalizeGoalDifficulty } from "../domain/stats";
+import { normalizeDailyGoalHours, normalizeGoalDifficulty } from "../domain/stats";
 import { AuthUser, listenToAuthState, toAuthUser } from "../services/auth";
 import {
   ensureUserProfile,
@@ -23,7 +23,7 @@ export interface CreateTaskInput {
   time: string;
   duration: number;
   energy: EnergyLevel;
-  goalId?: string;
+  goalIds?: string[];
 }
 
 export interface CreateGoalInput {
@@ -32,6 +32,7 @@ export interface CreateGoalInput {
   difficulty: GoalDifficulty;
   startDate: string;
   deadline: string;
+  dailyGoalHours: number;
   progress: number;
 }
 
@@ -42,7 +43,7 @@ interface ToastState {
 
 interface DeletedGoalSnapshot {
   goal: Goal;
-  affectedTaskIds: string[];
+  affectedTasks: Task[];
 }
 
 interface AppStoreState {
@@ -113,6 +114,44 @@ function normalizeDuration(value: number) {
   return Math.max(5, Math.min(720, Math.round(value)));
 }
 
+function normalizeGoalIds(goalIds?: string[]) {
+  return Array.from(new Set((goalIds ?? []).filter(Boolean)));
+}
+
+function migrateAppData(data: AppData): AppData {
+  const legacySettings = data.settings as AppSettings & { dailyGoalHours?: number };
+  const globalDailyGoalHours = normalizeDailyGoalHours(
+    legacySettings.globalDailyGoalHours ?? legacySettings.dailyGoalHours,
+    createInitialAppData().settings.globalDailyGoalHours,
+  );
+  const settings: AppSettings = {
+    ...createInitialAppData().settings,
+    ...data.settings,
+    globalDailyGoalHours,
+  };
+  const goals = data.goals.map((goal) => ({
+    ...goal,
+    difficulty: normalizeGoalDifficulty(goal.difficulty),
+    dailyGoalHours: normalizeDailyGoalHours(goal.dailyGoalHours, globalDailyGoalHours),
+  }));
+  const goalIdSet = new Set(goals.map((goal) => goal.id));
+  const tasks = data.tasks.map((task) => {
+    const legacyGoalId = (task as Task & { goalId?: string }).goalId;
+    const goalIds = normalizeGoalIds([...(task.goalIds ?? []), ...(legacyGoalId ? [legacyGoalId] : [])]).filter((id) => goalIdSet.has(id));
+    return {
+      ...task,
+      goalIds,
+    };
+  });
+
+  return {
+    schemaVersion: 2,
+    settings,
+    goals,
+    tasks,
+  };
+}
+
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
@@ -139,7 +178,7 @@ function reducer(state: AppStoreState, action: Action): AppStoreState {
     case "SYNC_LOADING":
       return { ...state, isReady: false, error: undefined };
     case "HYDRATED":
-      return { ...state, data: action.data, profile: action.profile ?? state.user, isReady: true, error: undefined };
+      return { ...state, data: migrateAppData(action.data), profile: action.profile ?? state.user, isReady: true, error: undefined };
     case "AUTH_FAILED":
       return { ...state, authReady: true, isReady: true, error: action.error };
     case "SYNC_FAILED":
@@ -168,7 +207,7 @@ function reducer(state: AppStoreState, action: Action): AppStoreState {
                   duration: normalizeDuration(action.input.duration),
                   focusMinutes: normalizeDuration(action.input.duration),
                   energy: action.input.energy,
-                  goalId: action.input.goalId,
+                  goalIds: normalizeGoalIds(action.input.goalIds),
                   updatedAt: action.updatedAt,
                 }
               : task,
@@ -230,6 +269,7 @@ function reducer(state: AppStoreState, action: Action): AppStoreState {
                   difficulty: normalizeGoalDifficulty(action.input.difficulty),
                   startDate,
                   deadline: deadline <= startDate ? addDays(startDate, 30) : deadline,
+                  dailyGoalHours: normalizeDailyGoalHours(action.input.dailyGoalHours, state.data.settings.globalDailyGoalHours),
                   progress: Math.round(Math.max(0, Math.min(100, action.input.progress))),
                   updatedAt: action.updatedAt,
                 }
@@ -242,15 +282,17 @@ function reducer(state: AppStoreState, action: Action): AppStoreState {
     case "DELETE_GOAL": {
       const goal = state.data.goals.find((item) => item.id === action.id);
       if (!goal) return state;
-      const affectedTaskIds = state.data.tasks.filter((task) => task.goalId === action.id).map((task) => task.id);
+      const affectedTasks = state.data.tasks.filter((task) => task.goalIds.includes(action.id));
       return {
         ...state,
         data: {
           ...state.data,
           goals: state.data.goals.filter((item) => item.id !== action.id),
-          tasks: state.data.tasks.map((task) => (task.goalId === action.id ? { ...task, goalId: undefined } : task)),
+          tasks: state.data.tasks.map((task) =>
+            task.goalIds.includes(action.id) ? { ...task, goalIds: task.goalIds.filter((goalId) => goalId !== action.id) } : task,
+          ),
         },
-        deletedGoal: { goal, affectedTaskIds },
+        deletedGoal: { goal, affectedTasks },
         deletedTask: undefined,
         toast: { message: "Goal deleted", undoType: "goal" },
       };
@@ -263,8 +305,8 @@ function reducer(state: AppStoreState, action: Action): AppStoreState {
           ...state.data,
           goals: [...state.data.goals, state.deletedGoal.goal],
           tasks: state.data.tasks.map((task) =>
-            state.deletedGoal?.affectedTaskIds.includes(task.id)
-              ? { ...task, goalId: state.deletedGoal.goal.id }
+            state.deletedGoal?.affectedTasks.find((affectedTask) => affectedTask.id === task.id)?.goalIds
+              ? { ...task, goalIds: state.deletedGoal.affectedTasks.find((affectedTask) => affectedTask.id === task.id)?.goalIds ?? task.goalIds }
               : task,
           ),
         },
@@ -387,7 +429,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       duration: normalizeDuration(input.duration),
       focusMinutes: normalizeDuration(input.duration),
       energy: input.energy,
-      goalId: input.goalId,
+      goalIds: normalizeGoalIds(input.goalIds),
       done: false,
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -416,7 +458,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       duration: normalizeDuration(input.duration),
       focusMinutes: normalizeDuration(input.duration),
       energy: input.energy,
-      goalId: input.goalId,
+      goalIds: normalizeGoalIds(input.goalIds),
       updatedAt,
     };
     try {
@@ -479,6 +521,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         saveGoal(userId, deletedGoal.goal, state.data.tasks).catch((error: unknown) => {
           dispatch({ type: "SYNC_FAILED", error: getErrorMessage(error, "Could not restore goal") });
         });
+        Promise.all(deletedGoal.affectedTasks.map((task) => saveTask(userId, task))).catch((error: unknown) => {
+          dispatch({ type: "SYNC_FAILED", error: getErrorMessage(error, "Could not restore goal links") });
+        });
       }
     } catch (error: unknown) {
       dispatch({ type: "SYNC_FAILED", error: getErrorMessage(error, "Could not restore item") });
@@ -496,6 +541,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       difficulty: normalizeGoalDifficulty(input.difficulty),
       startDate,
       deadline: deadline <= startDate ? addDays(startDate, 30) : deadline,
+      dailyGoalHours: normalizeDailyGoalHours(input.dailyGoalHours, state.data.settings.globalDailyGoalHours),
       progress: Math.round(Math.max(0, Math.min(100, input.progress))),
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -524,6 +570,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       difficulty: normalizeGoalDifficulty(input.difficulty),
       startDate,
       deadline: deadline <= startDate ? addDays(startDate, 30) : deadline,
+      dailyGoalHours: normalizeDailyGoalHours(input.dailyGoalHours, state.data.settings.globalDailyGoalHours),
       progress: Math.round(Math.max(0, Math.min(100, input.progress))),
       updatedAt,
     };

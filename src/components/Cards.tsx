@@ -39,8 +39,12 @@ export const GoalCard = React.memo(function GoalCard({ goal, onPress }: GoalCard
       <View style={styles.goalFooter}>
         <View style={styles.goalStats}>
           <View>
-            <Text style={typography.micro}>Success Rate</Text>
-            <Text style={styles.goalStatValue}>{goal.successRate}%</Text>
+            <Text style={typography.micro}>Health</Text>
+            <Text style={styles.goalStatValue}>{goal.healthScore}%</Text>
+          </View>
+          <View>
+            <Text style={typography.micro}>Daily Target</Text>
+            <Text style={styles.goalStatValue}>{goal.dailyTargetHours}h</Text>
           </View>
           <View>
             <Text style={typography.micro}>Days Left</Text>
@@ -56,7 +60,7 @@ export const GoalCard = React.memo(function GoalCard({ goal, onPress }: GoalCard
   );
 });
 
-type InsightType = "neutral" | "warning" | "positive";
+type InsightType = "info" | "neutral" | "warning" | "positive";
 
 interface InsightCardProps {
   icon: string;
@@ -70,6 +74,7 @@ export const InsightCard = React.memo(function InsightCard({ icon, title, body, 
   const styles = useMemo(() => createStyles(colors, spacing, radius, mode), [colors, spacing, radius, mode]);
   const entrance = useEntranceProgress({ duration: 340 });
   const borderColor = {
+    info: colors.accent,
     neutral: colors.accent,
     warning: colors.warning,
     positive: colors.success,
@@ -137,7 +142,7 @@ interface TimelineItemProps {
   onToggle?: (id: string) => void;
   onDelete?: (id: string) => void;
   onEdit?: (task: Task) => void;
-  goalTitle?: string;
+  goalTitles?: string[];
 }
 
 export const TimelineItem = React.memo(function TimelineItem({
@@ -146,7 +151,7 @@ export const TimelineItem = React.memo(function TimelineItem({
   onToggle,
   onDelete,
   onEdit,
-  goalTitle,
+  goalTitles = [],
 }: TimelineItemProps) {
   const { colors, spacing, radius, typography, mode } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, spacing, radius, mode), [colors, spacing, radius, mode]);
@@ -199,7 +204,7 @@ export const TimelineItem = React.memo(function TimelineItem({
                 {task.title}
               </Text>
               <Text style={typography.micro}>
-                {task.duration} min{goalTitle ? ` / ${goalTitle}` : ""}
+                {task.duration} min{goalTitles.length ? ` / ${goalTitles.join(", ")}` : ""}
               </Text>
             </View>
             <TagChip label={task.tag} />

@@ -1,7 +1,7 @@
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import { AppData, GoalMetrics, Task } from "../domain/models";
-import { enrichGoals, getAnalyticsData } from "../domain/stats";
+import { enrichGoals, getAnalyticsData, getAverage, round } from "../domain/stats";
 
 const CHANNEL_ID = "momentum-reminders";
 const NOTIFICATION_PREFIX = "momentum-";
@@ -96,14 +96,14 @@ async function scheduleTaskNotification(task: Task, leadMinutes: number) {
 }
 
 async function scheduleRiskNotification(highRiskGoals: GoalMetrics[]) {
-  const topRiskGoal = highRiskGoals.sort((a, b) => a.successRate - b.successRate)[0];
+  const topRiskGoal = highRiskGoals.sort((a, b) => a.healthScore - b.healthScore)[0];
   if (!topRiskGoal) return;
 
   await Notifications.scheduleNotificationAsync({
     identifier: RISK_NOTIFICATION_ID,
     content: {
       title: "Goal risk alert",
-      body: `Review "${topRiskGoal.title}" - success rate ${topRiskGoal.successRate}%`,
+      body: `Review "${topRiskGoal.title}" - health ${topRiskGoal.healthScore}%`,
       data: { momentum: true, kind: "risk" satisfies MomentumNotificationKind, goalId: topRiskGoal.id },
       priority: Notifications.AndroidNotificationPriority.HIGH,
     },
@@ -118,11 +118,13 @@ async function scheduleRiskNotification(highRiskGoals: GoalMetrics[]) {
 
 async function scheduleWeeklyReportNotification(data: AppData) {
   const analytics = getAnalyticsData(data.goals, data.tasks);
+  const weeklyCompletionRate = Math.round(getAverage(analytics.overallWeeklyCompletion));
+  const avgDailyFocusHours = round(getAverage(analytics.overallFocusHours), 1);
   await Notifications.scheduleNotificationAsync({
     identifier: WEEKLY_NOTIFICATION_ID,
     content: {
       title: "Weekly report",
-      body: `${analytics.weeklyCompletionRate}% completion, ${analytics.avgDailyFocusHours}h avg focus, ${analytics.activeDays30} active days`,
+      body: `${weeklyCompletionRate}% completion, ${avgDailyFocusHours}h avg focus, ${analytics.activeDays30} active days`,
       data: { momentum: true, kind: "weekly" satisfies MomentumNotificationKind },
       priority: Notifications.AndroidNotificationPriority.HIGH,
     },

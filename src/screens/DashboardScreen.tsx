@@ -65,7 +65,7 @@ export function DashboardScreen({ onGoalPress }: Props) {
           </View>
           <View style={styles.progressBarLabels}>
             <Text style={typography.micro}>0h</Text>
-            <Text style={typography.micro}>{data.settings.dailyGoalHours}h goal</Text>
+            <Text style={typography.micro}>{data.settings.globalDailyGoalHours}h baseline</Text>
           </View>
         </View>
       </View>
@@ -79,7 +79,7 @@ export function DashboardScreen({ onGoalPress }: Props) {
                 key={task.id}
                 task={task}
                 isLast={index === todayTasks.length - 1}
-                goalTitle={task.goalId ? goalTitleById[task.goalId] : undefined}
+                goalTitles={task.goalIds.map((goalId) => goalTitleById[goalId]).filter(Boolean)}
                 onToggle={actions.toggleTask}
                 onDelete={actions.deleteTask}
               />

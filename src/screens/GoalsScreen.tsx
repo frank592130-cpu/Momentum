@@ -289,7 +289,7 @@ function DifficultySelector({ value, onChange }: { value: GoalDifficulty; onChan
 }
 
 const TARGET_HOURS = Array.from({ length: 25 }, (_, i) => String(i));
-const TARGET_MINUTES = ["00", "15", "30", "45"];
+const TARGET_MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
 
 function DailyTargetSelector({ value, onChange }: { value: number; onChange: (value: number) => void }) {
   const { colors, spacing, radius, typography } = useAppTheme();
@@ -307,6 +307,10 @@ function DailyTargetSelector({ value, onChange }: { value: number; onChange: (va
   return (
     <View style={styles.dailyTargetWheelPanel}>
       <Text style={typography.micro}>Daily Target</Text>
+      <View style={styles.dailyTargetLabelsRow}>
+        <Text style={styles.dailyTargetLabel}>hr</Text>
+        <Text style={styles.dailyTargetLabel}>min</Text>
+      </View>
       <View style={styles.dailyTargetWheelRow}>
         <View pointerEvents="none" style={styles.wheelSelectionBand} />
         <WheelColumn
@@ -314,17 +318,11 @@ function DailyTargetSelector({ value, onChange }: { value: number; onChange: (va
           value={hourString}
           onChange={(next) => onChange(Number(next) + Number(closestMin) / 60)}
         />
-        <View style={styles.dailyTargetUnitWrap}>
-          <Text style={styles.dailyTargetUnit}>hr</Text>
-        </View>
         <WheelColumn
           values={TARGET_MINUTES}
           value={closestMin}
           onChange={(next) => onChange(Number(hourString) + Number(next) / 60)}
         />
-        <View style={styles.dailyTargetUnitWrap}>
-          <Text style={styles.dailyTargetUnit}>min</Text>
-        </View>
       </View>
     </View>
   );
@@ -634,18 +632,19 @@ function createStyles(colors: ThemeColors, spacingValue: typeof import("../theme
       position: "relative",
       gap: spacingValue.sm,
     },
-    dailyTargetUnitWrap: {
-      width: 50,
-      height: WHEEL_HEIGHT,
-      alignItems: "center",
-      justifyContent: "center",
+    dailyTargetLabelsRow: {
+      flexDirection: "row",
+      gap: spacingValue.sm,
+      marginBottom: -8,
       zIndex: 1,
     },
-    dailyTargetUnit: {
-      color: colors.textPrimary,
-      fontSize: 14,
+    dailyTargetLabel: {
+      flex: 1,
+      textAlign: "center",
+      color: colors.textSecondary,
+      fontSize: 11,
       fontWeight: "800",
-      opacity: 0.7,
+      textTransform: "uppercase",
     },
     addButton: {
       alignItems: "center",

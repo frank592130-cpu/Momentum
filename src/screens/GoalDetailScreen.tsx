@@ -346,20 +346,86 @@ function DailyTargetSelector({ value, onChange }: { value: number; onChange: (va
 function CategorySelector({ options, value, onChange }: { options: string[]; value: string; onChange: (value: string) => void }) {
   const { colors, spacing, radius, typography } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, spacing, radius), [colors, spacing, radius]);
+  const [isAddingCustom, setIsAddingCustom] = useState(false);
+  const [customCategory, setCustomCategory] = useState("");
+
+  const displayOptions = useMemo(() => {
+    const selectedCategory = value.trim();
+    return Array.from(new Set([...options, ...(selectedCategory ? [selectedCategory] : [])]));
+  }, [options, value]);
+
+  const commitCustomCategory = () => {
+    const nextCategory = customCategory.trim();
+    if (!nextCategory) return;
+    onChange(nextCategory);
+    setCustomCategory("");
+    setIsAddingCustom(false);
+  };
+
   return (
     <View style={styles.categoryGroup}>
       <Text style={typography.micro}>Category</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
-        {options.map((option) => {
+        {displayOptions.map((option) => {
           const active = option === value;
           return (
-            <TouchableOpacity key={option} onPress={() => onChange(option)} style={[styles.categoryChip, active && styles.categoryChipActive]}>
-              <Text style={[styles.categoryText, active && styles.categoryTextActive]} numberOfLines={1}>{option}</Text>
+            <TouchableOpacity
+              key={option}
+              onPress={() => {
+                onChange(option);
+                setIsAddingCustom(false);
+                setCustomCategory("");
+              }}
+              style={[styles.categoryChip, active && styles.categoryChipActive]}
+            >
+              <Text style={[styles.categoryText, active && styles.categoryTextActive]} numberOfLines={1}>
+                {option}
+              </Text>
             </TouchableOpacity>
           );
         })}
+        <TouchableOpacity
+          onPress={() => setIsAddingCustom(true)}
+          style={[styles.addCategoryButton, isAddingCustom && styles.addCategoryButtonActive]}
+          activeOpacity={0.75}
+          accessibilityLabel="Add custom category"
+        >
+          <Text style={styles.addCategoryButtonText}>+</Text>
+        </TouchableOpacity>
       </ScrollView>
-      <TextInput value={value} onChangeText={onChange} placeholder="Create custom category" placeholderTextColor={colors.textTertiary} style={styles.input} />
+      {isAddingCustom ? (
+        <View style={styles.customCategoryRow}>
+          <TextInput
+            value={customCategory}
+            onChangeText={setCustomCategory}
+            onSubmitEditing={commitCustomCategory}
+            placeholder="New category"
+            placeholderTextColor={colors.textTertiary}
+            style={[styles.input, styles.customCategoryInput]}
+            autoFocus
+            returnKeyType="done"
+          />
+          <TouchableOpacity
+            onPress={commitCustomCategory}
+            style={[styles.customCategoryActionButton, styles.customCategoryConfirmButton]}
+            activeOpacity={0.75}
+            accessibilityLabel="Save custom category"
+          >
+            <Text style={[styles.customCategoryActionText, styles.customCategoryConfirmText]}>+</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              setCustomCategory("");
+              setIsAddingCustom(false);
+            }}
+            style={styles.customCategoryActionButton}
+            activeOpacity={0.75}
+            accessibilityLabel="Cancel custom category"
+          >
+            <Text style={styles.customCategoryActionText}>x</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -572,6 +638,44 @@ function createStyles(colors: ThemeColors, spacingValue: typeof import("../theme
     categoryChipActive: { borderColor: colors.accent, backgroundColor: colors.accentSubtle },
     categoryText: { color: colors.textSecondary, fontSize: 12, fontWeight: "700" },
     categoryTextActive: { color: colors.accent },
+    addCategoryButton: {
+      width: 38,
+      minHeight: 34,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: radiusValue.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.bgElevated,
+    },
+    addCategoryButtonActive: {
+      borderColor: colors.accent,
+      backgroundColor: colors.accentSubtle,
+    },
+    addCategoryButtonText: { color: colors.accent, fontSize: 20, fontWeight: "800", lineHeight: 20 },
+    customCategoryRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacingValue.sm,
+      marginTop: spacingValue.sm,
+    },
+    customCategoryInput: { flex: 1 },
+    customCategoryActionButton: {
+      width: 42,
+      minHeight: 42,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: radiusValue.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.bgElevated,
+    },
+    customCategoryConfirmButton: {
+      borderColor: colors.accent,
+      backgroundColor: colors.accentSubtle,
+    },
+    customCategoryActionText: { color: colors.textSecondary, fontSize: 16, fontWeight: "800", lineHeight: 18 },
+    customCategoryConfirmText: { color: colors.accent, fontSize: 20, lineHeight: 20 },
     dateWheelPanel: {
       gap: spacingValue.md,
       borderWidth: 1,

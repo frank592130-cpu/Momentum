@@ -40,8 +40,8 @@ export function AnimatedBackground() {
             ry={topCenterRy.toString()}
             gradientUnits="userSpaceOnUse"
           >
-            <Stop offset="0%" stopColor={topCenterColor} stopOpacity={isDark ? "0.60" : "0.42"} />
-            <Stop offset="40%" stopColor={topCenterColor} stopOpacity={isDark ? "0.28" : "0.20"} />
+            <Stop offset="0%" stopColor={topCenterColor} stopOpacity={isDark ? "0.60" : "0"} />
+            <Stop offset="40%" stopColor={topCenterColor} stopOpacity={isDark ? "0.28" : "0"} />
             <Stop offset="100%" stopColor={topCenterColor} stopOpacity="0" />
           </RadialGradient>
 
@@ -54,8 +54,8 @@ export function AnimatedBackground() {
             ry={cornerRy.toString()}
             gradientUnits="userSpaceOnUse"
           >
-            <Stop offset="0%" stopColor={cornerColor} stopOpacity={isDark ? "0.40" : "0.28"} />
-            <Stop offset="45%" stopColor={cornerColor} stopOpacity={isDark ? "0.18" : "0.14"} />
+            <Stop offset="0%" stopColor={cornerColor} stopOpacity={isDark ? "0.40" : "0"} />
+            <Stop offset="45%" stopColor={cornerColor} stopOpacity={isDark ? "0.18" : "0"} />
             <Stop offset="100%" stopColor={cornerColor} stopOpacity="0" />
           </RadialGradient>
 
@@ -68,8 +68,8 @@ export function AnimatedBackground() {
             ry={cornerRy.toString()}
             gradientUnits="userSpaceOnUse"
           >
-            <Stop offset="0%" stopColor={cornerColor} stopOpacity={isDark ? "0.40" : "0.28"} />
-            <Stop offset="45%" stopColor={cornerColor} stopOpacity={isDark ? "0.18" : "0.14"} />
+            <Stop offset="0%" stopColor={cornerColor} stopOpacity={isDark ? "0.40" : "0"} />
+            <Stop offset="45%" stopColor={cornerColor} stopOpacity={isDark ? "0.18" : "0"} />
             <Stop offset="100%" stopColor={cornerColor} stopOpacity="0" />
           </RadialGradient>
         </Defs>

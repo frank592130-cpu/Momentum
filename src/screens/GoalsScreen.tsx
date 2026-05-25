@@ -113,7 +113,7 @@ export function GoalsScreen({ onGoalPress }: Props) {
       <View>
        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 10, paddingBottom: 0.5 }}>
         <View>
-          <Text style={{ fontSize: 30, fontWeight: 'bold', color: '#333', paddingBottom: 20 }}>All Goals</Text>
+          <Text style={{ fontSize: 30, fontWeight: 'bold', color: colors.textPrimary, paddingBottom: 20 }}>All Goals</Text>
         </View>
         <TouchableOpacity
           style={styles.plusGoalButton}

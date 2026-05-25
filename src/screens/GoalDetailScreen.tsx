@@ -334,36 +334,29 @@ function DifficultySelector({ value, onChange }: { value: GoalDifficulty; onChan
   );
 }
 
+const DAILY_HOURS = Array.from({ length: 16 }, (_, i) => String((i + 1) * 0.5));
+
 function DailyTargetSelector({ value, onChange }: { value: number; onChange: (value: number) => void }) {
   const { colors, spacing, radius, typography } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, spacing, radius), [colors, spacing, radius]);
-  const options = [0.5, 1, 2, 3, 4];
+  const closestValue = DAILY_HOURS.reduce((prev, curr) =>
+    Math.abs(Number(curr) - value) < Math.abs(Number(prev) - value) ? curr : prev,
+    DAILY_HOURS[0],
+  );
   return (
-    <View style={styles.categoryGroup}>
+    <View style={styles.dailyTargetWheelPanel}>
       <Text style={typography.micro}>Daily Target</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
-        {options.map((option) => {
-          const active = value === option;
-          return (
-            <TouchableOpacity key={option} onPress={() => onChange(option)} style={[styles.categoryChip, active && styles.categoryChipActive]}>
-              <Text style={[styles.categoryText, active && styles.categoryTextActive]} numberOfLines={1}>
-                {option}h
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-      <TextInput
-        value={String(value)}
-        onChangeText={(nextValue) => {
-          const parsed = Number(nextValue);
-          onChange(Number.isFinite(parsed) ? parsed : value);
-        }}
-        keyboardType="decimal-pad"
-        placeholder="Hours per day"
-        placeholderTextColor={colors.textTertiary}
-        style={styles.input}
-      />
+      <View style={styles.dailyTargetWheelRow}>
+        <View pointerEvents="none" style={styles.wheelSelectionBand} />
+        <WheelColumn
+          values={DAILY_HOURS}
+          value={closestValue}
+          onChange={(next) => onChange(Number(next))}
+        />
+        <View style={styles.dailyTargetUnitWrap}>
+          <Text style={styles.dailyTargetUnit}>hours</Text>
+        </View>
+      </View>
     </View>
   );
 }
@@ -623,6 +616,35 @@ function createStyles(colors: ThemeColors, spacingValue: typeof import("../theme
       borderWidth: 1,
       borderColor: colors.accent,
       backgroundColor: colors.accentSubtle,
+    },
+    dailyTargetWheelPanel: {
+      gap: spacingValue.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.bgElevated,
+      borderRadius: radiusValue.md,
+      padding: spacingValue.md,
+    },
+    dailyTargetWheelRow: {
+      height: WHEEL_HEIGHT,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      position: "relative",
+      gap: spacingValue.sm,
+    },
+    dailyTargetUnitWrap: {
+      width: 50,
+      height: WHEEL_HEIGHT,
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 1,
+    },
+    dailyTargetUnit: {
+      color: colors.textPrimary,
+      fontSize: 14,
+      fontWeight: "800",
+      opacity: 0.7,
     },
     saveAction: {
       minHeight: 44,

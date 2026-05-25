@@ -1,8 +1,8 @@
 import React, { createContext, useCallback, useEffect, useMemo, useReducer } from "react";
 import { createInitialAppData } from "../data/initialData";
 import { addDays, isValidDateKey, toDateKey } from "../domain/date";
-import { AppData, AppSettings, EnergyLevel, Goal, GoalDifficulty, Task, ThemePreference } from "../domain/models";
-import { normalizeDailyGoalHours, normalizeGoalDifficulty } from "../domain/stats";
+import { AppData, AppSettings, EnergyLevel, Goal, Task, ThemePreference } from "../domain/models";
+import { normalizeDailyGoalHours } from "../domain/stats";
 import { AuthUser, listenToAuthState, toAuthUser } from "../services/auth";
 import {
   ensureUserProfile,
@@ -29,7 +29,6 @@ export interface CreateTaskInput {
 export interface CreateGoalInput {
   title: string;
   category: string;
-  difficulty: GoalDifficulty;
   startDate: string;
   deadline: string;
   dailyGoalHours: number;
@@ -129,11 +128,13 @@ function migrateAppData(data: AppData): AppData {
     ...data.settings,
     globalDailyGoalHours,
   };
-  const goals = data.goals.map((goal) => ({
-    ...goal,
-    difficulty: normalizeGoalDifficulty(goal.difficulty),
-    dailyGoalHours: normalizeDailyGoalHours(goal.dailyGoalHours, globalDailyGoalHours),
-  }));
+  const goals = data.goals.map((goal) => {
+    const { difficulty, ...rest } = goal as any;
+    return {
+      ...rest,
+      dailyGoalHours: normalizeDailyGoalHours(goal.dailyGoalHours, globalDailyGoalHours),
+    };
+  });
   const goalIdSet = new Set(goals.map((goal) => goal.id));
   const tasks = data.tasks.map((task) => {
     const legacyGoalId = (task as Task & { goalId?: string }).goalId;
@@ -266,7 +267,6 @@ function reducer(state: AppStoreState, action: Action): AppStoreState {
                   ...goal,
                   title: action.input.title.trim(),
                   category: action.input.category.trim() || "Personal",
-                  difficulty: normalizeGoalDifficulty(action.input.difficulty),
                   startDate,
                   deadline: deadline <= startDate ? addDays(startDate, 30) : deadline,
                   dailyGoalHours: normalizeDailyGoalHours(action.input.dailyGoalHours, state.data.settings.globalDailyGoalHours),
@@ -538,7 +538,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       id: createId("goal"),
       title: input.title.trim(),
       category: input.category.trim() || "Personal",
-      difficulty: normalizeGoalDifficulty(input.difficulty),
       startDate,
       deadline: deadline <= startDate ? addDays(startDate, 30) : deadline,
       dailyGoalHours: normalizeDailyGoalHours(input.dailyGoalHours, state.data.settings.globalDailyGoalHours),
@@ -567,7 +566,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ...current,
       title: input.title.trim(),
       category: input.category.trim() || "Personal",
-      difficulty: normalizeGoalDifficulty(input.difficulty),
       startDate,
       deadline: deadline <= startDate ? addDays(startDate, 30) : deadline,
       dailyGoalHours: normalizeDailyGoalHours(input.dailyGoalHours, state.data.settings.globalDailyGoalHours),

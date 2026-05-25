@@ -42,6 +42,12 @@
           "defaultChannel": "momentum-reminders"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "03ceede6-1212-4f7e-a909-32a46a7ceb54"
+      }
+    },
+    "owner": "jfan08"
   }
 }

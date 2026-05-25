@@ -96,14 +96,14 @@ async function scheduleTaskNotification(task: Task, leadMinutes: number) {
 }
 
 async function scheduleRiskNotification(highRiskGoals: GoalMetrics[]) {
-  const topRiskGoal = highRiskGoals.sort((a, b) => a.healthScore - b.healthScore)[0];
+  const topRiskGoal = highRiskGoals.sort((a, b) => a.velocityTrend - b.velocityTrend)[0];
   if (!topRiskGoal) return;
 
   await Notifications.scheduleNotificationAsync({
     identifier: RISK_NOTIFICATION_ID,
     content: {
       title: "Goal risk alert",
-      body: `Review "${topRiskGoal.title}" - health ${topRiskGoal.healthScore}%`,
+      body: `Review "${topRiskGoal.title}" - progress is ${topRiskGoal.progress}% and velocity trend is ${topRiskGoal.velocityTrend}%`,
       data: { momentum: true, kind: "risk" satisfies MomentumNotificationKind, goalId: topRiskGoal.id },
       priority: Notifications.AndroidNotificationPriority.HIGH,
     },

@@ -5,8 +5,8 @@ import { ProgressRing } from "../components/Charts";
 import { MotionPanel } from "../components/Motion";
 import { WHEEL_HEIGHT, WHEEL_ITEM_HEIGHT, WheelColumn } from "../components/WheelPicker";
 import { addDays, formatDateLabel, toDateKey } from "../domain/date";
-import { GoalDifficulty, GoalMetrics } from "../domain/models";
-import { enrichGoals } from "../domain/stats";
+import { GoalMetrics } from "../domain/models";
+import { enrichGoals, getAnalyticsData } from "../domain/stats";
 import { useAppActions, useAppState } from "../store/AppStore";
 import { ThemeColors, useAppTheme } from "../theme";
 
@@ -28,7 +28,6 @@ export function GoalsScreen({ onGoalPress }: Props) {
   const [draft, setDraft] = useState({
     title: "",
     category: "Personal",
-    difficulty: "standard" as GoalDifficulty,
     startDate: today,
     deadline: addDays(today, 30),
     dailyGoalHours: data.settings.globalDailyGoalHours,
@@ -37,7 +36,8 @@ export function GoalsScreen({ onGoalPress }: Props) {
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [editingGoalId, setEditingGoalId] = useState<string | undefined>();
 
-  const avgHealth = goals.length ? Math.round(goals.reduce((sum, goal) => sum + goal.healthScore, 0) / goals.length) : 0;
+  const analyticsData = useMemo(() => getAnalyticsData(data.goals, data.tasks, today), [data.goals, data.tasks, today]);
+  const overallBalance = analyticsData.goalBalanceScore;
   const onTrack = goals.filter((goal) => goal.risk === "low").length;
   const atRisk = goals.filter((goal) => goal.risk === "high").length;
   const categoryOptions = useMemo(() => {
@@ -49,7 +49,6 @@ export function GoalsScreen({ onGoalPress }: Props) {
     setDraft({
       title: "",
       category: categoryOptions[0] ?? "Personal",
-      difficulty: "standard",
       startDate: today,
       deadline: addDays(today, 30),
       dailyGoalHours: data.settings.globalDailyGoalHours,
@@ -67,7 +66,6 @@ export function GoalsScreen({ onGoalPress }: Props) {
     const input = {
       title: draft.title,
       category: draft.category,
-      difficulty: draft.difficulty,
       startDate: draft.startDate,
       deadline: draft.deadline,
       dailyGoalHours: draft.dailyGoalHours,
@@ -90,11 +88,11 @@ export function GoalsScreen({ onGoalPress }: Props) {
       </View>
 
       <View style={styles.summaryCard}>
-        <ProgressRing size={88} progress={avgHealth} color={colors.accent} strokeWidth={7}>
-          <Text style={styles.ringVal}>{avgHealth}%</Text>
+        <ProgressRing size={88} progress={overallBalance} color={colors.accent} strokeWidth={7}>
+          <Text style={styles.ringVal}>{overallBalance}%</Text>
         </ProgressRing>
         <View style={styles.ringRight}>
-          <Text style={typography.titleSmall}>Overall Goal Health</Text>
+          <Text style={typography.titleSmall}>Overall Goal Balance</Text>
           <View style={styles.statsRow}>
             <Metric label="On Track" value={`${onTrack}`} color={colors.success} />
             <View style={styles.statDivider} />
@@ -193,12 +191,12 @@ function GoalEditorModal({
 }: {
   visible: boolean;
   title: string;
-  draft: { title: string; category: string; difficulty: GoalDifficulty; startDate: string; deadline: string; dailyGoalHours: number };
+  draft: { title: string; category: string; startDate: string; deadline: string; dailyGoalHours: number };
   categoryOptions: string[];
   error: string;
   onClose: () => void;
   onChange: React.Dispatch<
-    React.SetStateAction<{ title: string; category: string; difficulty: GoalDifficulty; startDate: string; deadline: string; dailyGoalHours: number }>
+    React.SetStateAction<{ title: string; category: string; startDate: string; deadline: string; dailyGoalHours: number }>
   >;
   onSave: () => void;
   onDelete?: () => void;
@@ -412,8 +410,8 @@ function GoalRow({
         <View style={styles.goalBottom}>
           <View style={styles.goalMetrics}>
             <View>
-              <Text style={typography.micro}>Health</Text>
-              <Text style={[styles.metaVal, { color: goal.risk === "high" ? colors.danger : colors.textPrimary }]}>{goal.healthScore}%</Text>
+              <Text style={typography.micro}>Streak</Text>
+              <Text style={[styles.metaVal, { color: goal.currentStreak >= 7 ? colors.success : colors.textPrimary }]}>{goal.currentStreak}d</Text>
             </View>
             <View>
               <Text style={typography.micro}>Daily</Text>

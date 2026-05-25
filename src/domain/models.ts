@@ -4,7 +4,6 @@ export type ISODateTimeString = string;
 export type EnergyLevel = "low" | "medium" | "high";
 export type RiskLevel = "low" | "medium" | "high";
 export type ThemePreference = "system" | "light" | "dark";
-export type GoalDifficulty = "easy" | "standard" | "hard" | "extreme";
 export type GoalProgressSource = "manual" | "tasks";
 export type AnalyticsInsightSeverity = "positive" | "neutral" | "warning";
 export type AnalyticsInsightType = "capacity" | "balance" | "streak" | "velocity";
@@ -13,7 +12,6 @@ export interface Goal {
   id: string;
   title: string;
   category: string;
-  difficulty: GoalDifficulty;
   startDate: ISODateString;
   deadline: ISODateString;
   dailyGoalHours: number;
@@ -60,16 +58,6 @@ export interface AppData {
 
 export interface GoalMetrics extends Goal {
   daysLeft: number;
-  expectedProgress: number;
-  paceScore: number;
-  progressScore: number;
-  effortScore: number;
-  planningScore: number;
-  consistencyScore: number;
-  momentumScore: number;
-  completionRate: number;
-  trendScore: number;
-  healthScore: number;
   risk: RiskLevel;
   weeklyHours: number[];
   dailyTargetHours: number;
@@ -78,7 +66,15 @@ export interface GoalMetrics extends Goal {
   plannedLinkedMinutes: number;
   completedLinkedMinutes: number;
   progressSource: GoalProgressSource;
-  difficultyFactor: number;
+
+  // 新的分析指標
+  currentStreak: number;
+  longestStreak: number;
+  streakStartDate: ISODateString;
+  weeklyProgress: number;
+  velocityTrend: number;
+  goalBalanceScore: number;
+  dailyGoalMet: boolean;
 }
 
 export interface WorkloadSlice {

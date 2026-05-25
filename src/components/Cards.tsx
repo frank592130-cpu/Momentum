@@ -39,8 +39,8 @@ export const GoalCard = React.memo(function GoalCard({ goal, onPress }: GoalCard
       <View style={styles.goalFooter}>
         <View style={styles.goalStats}>
           <View>
-            <Text style={typography.micro}>Health</Text>
-            <Text style={styles.goalStatValue}>{goal.healthScore}%</Text>
+            <Text style={typography.micro}>Streak</Text>
+            <Text style={styles.goalStatValue}>{goal.currentStreak}d</Text>
           </View>
           <View>
             <Text style={typography.micro}>Daily Target</Text>

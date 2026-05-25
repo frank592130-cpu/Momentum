@@ -5,7 +5,7 @@ import { ProgressRing } from "../components/Charts";
 import { MotionPanel } from "../components/Motion";
 import { WHEEL_HEIGHT, WHEEL_ITEM_HEIGHT, WheelColumn } from "../components/WheelPicker";
 import { addDays, formatDateLabel, toDateKey } from "../domain/date";
-import { GoalDifficulty, Task } from "../domain/models";
+import { Task } from "../domain/models";
 import { enrichGoals } from "../domain/stats";
 import { useAppActions, useAppState } from "../store/AppStore";
 import { ThemeColors, useAppTheme } from "../theme";
@@ -37,7 +37,6 @@ export function GoalDetailScreen({ goalId, onBack }: Props) {
   const [draft, setDraft] = useState({
     title: "",
     category: "Personal",
-    difficulty: "standard" as GoalDifficulty,
     startDate: today,
     deadline: addDays(today, 30),
     dailyGoalHours: data.settings.globalDailyGoalHours,
@@ -53,7 +52,6 @@ export function GoalDetailScreen({ goalId, onBack }: Props) {
     setDraft({
       title: goal.title,
       category: goal.category,
-      difficulty: goal.difficulty,
       startDate: goal.startDate,
       deadline: goal.deadline,
       dailyGoalHours: goal.dailyTargetHours,
@@ -85,17 +83,17 @@ export function GoalDetailScreen({ goalId, onBack }: Props) {
   };
 
   const metrics = [
-    { label: "Goal Health", value: `${goal.healthScore}%`, color: riskColor },
+    { label: "Current Streak", value: `${goal.currentStreak} days`, color: goal.currentStreak >= 7 ? colors.success : colors.textPrimary },
     { label: "Daily Target", value: `${goal.dailyTargetHours}h`, color: colors.textPrimary },
     { label: "Days Left", value: `${goal.daysLeft}`, color: colors.textPrimary },
     { label: "Linked Tasks", value: `${completedLinked}/${linkedTasks.length}`, color: colors.textPrimary },
   ];
 
-  const formulaRows = [
-    { label: "Pace Score", value: goal.paceScore, weight: "35%", color: colors.accent },
-    { label: "Effort Score", value: goal.effortScore, weight: "35%", color: colors.success },
-    { label: "Planning", value: goal.planningScore, weight: "15%", color: colors.warning },
-    { label: "Momentum", value: goal.momentumScore, weight: "15%", color: colors.textTertiary },
+  const analyticsRows = [
+    { label: "Longest Streak", value: goal.longestStreak, unit: " days", color: colors.accent },
+    { label: "Weekly Progress", value: goal.weeklyProgress, unit: "/7 days", color: colors.success },
+    { label: "Velocity Trend", value: Math.abs(goal.velocityTrend), unit: "%", color: goal.velocityTrend >= 0 ? colors.success : colors.danger },
+    { label: "Daily Goal Met", value: goal.dailyGoalMet ? "✓" : "✗", unit: "", color: goal.dailyGoalMet ? colors.success : colors.warning },
   ];
   const categoryOptions = Array.from(new Set(["Personal", "Work", "Health", "Learning", ...data.goals.map((item) => item.category).filter(Boolean)]));
 
@@ -170,19 +168,21 @@ export function GoalDetailScreen({ goalId, onBack }: Props) {
       </View>
 
       <View style={styles.card}>
-        <SectionHeader title="Health Formula" subtitle="Signals" />
+        <SectionHeader title="Goal Analytics" subtitle="Performance" />
         <View style={styles.formulaList}>
-          {formulaRows.map((row) => (
+          {analyticsRows.map((row) => (
             <View key={row.label}>
               <View style={styles.formulaRow}>
                 <Text style={typography.bodySmall}>{row.label}</Text>
                 <Text style={[styles.formulaValue, { color: row.color }]}>
-                  {row.value}% x {row.weight}
+                  {row.value}{row.unit}
                 </Text>
               </View>
-              <View style={styles.track}>
-                <View style={[styles.fill, { width: `${row.value}%`, backgroundColor: row.color }]} />
-              </View>
+              {row.unit === "%" ? (
+                <View style={styles.track}>
+                  <View style={[styles.fill, { width: `${Math.min(Number(row.value), 100)}%`, backgroundColor: row.color }]} />
+                </View>
+              ) : null}
             </View>
           ))}
         </View>
@@ -256,12 +256,12 @@ function GoalEditorModal({
   onSave,
 }: {
   visible: boolean;
-  draft: { title: string; category: string; difficulty: GoalDifficulty; startDate: string; deadline: string; dailyGoalHours: number };
+  draft: { title: string; category: string; startDate: string; deadline: string; dailyGoalHours: number };
   categoryOptions: string[];
   error: string;
   onClose: () => void;
   onChange: React.Dispatch<
-    React.SetStateAction<{ title: string; category: string; difficulty: GoalDifficulty; startDate: string; deadline: string; dailyGoalHours: number }>
+    React.SetStateAction<{ title: string; category: string; startDate: string; deadline: string; dailyGoalHours: number }>
   >;
   onSave: () => void;
 }) {

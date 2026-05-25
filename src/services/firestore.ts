@@ -15,8 +15,8 @@ import {
   Unsubscribe,
   type FieldValue,
 } from "firebase/firestore";
-import { AppData, AppSettings, EnergyLevel, Goal, GoalDifficulty, Task, ThemePreference } from "../domain/models";
-import { normalizeDailyGoalHours, normalizeGoalDifficulty } from "../domain/stats";
+import { AppData, AppSettings, EnergyLevel, Goal, Task, ThemePreference } from "../domain/models";
+import { normalizeDailyGoalHours } from "../domain/stats";
 import { createInitialAppData } from "../data/initialData";
 import { AuthUser, toAuthUser } from "./auth";
 import { firebaseCollections, getFirebaseFirestore } from "./firebase";
@@ -62,7 +62,6 @@ interface FirestoreGoalDocument {
   progress?: number;
   createdAt?: string;
   category?: string;
-  difficulty?: GoalDifficulty;
   startDate?: string;
   deadline?: string;
   dailyGoalHours?: number;
@@ -181,7 +180,6 @@ function fromGoalDocument(id: string, document: FirestoreGoalDocument): Goal {
     id,
     title: document.title ?? "Untitled goal",
     category: document.category ?? "Personal",
-    difficulty: normalizeGoalDifficulty(document.difficulty),
     startDate: document.startDate ?? new Date().toISOString().slice(0, 10),
     deadline,
     dailyGoalHours: normalizeDailyGoalHours(document.dailyGoalHours, defaultData.settings.globalDailyGoalHours),
@@ -198,7 +196,6 @@ function toGoalDocument(goal: Goal, tasks: Task[] = []): FirestoreGoalDocument {
     progress: goal.progress,
     createdAt: goal.createdAt,
     category: goal.category,
-    difficulty: normalizeGoalDifficulty(goal.difficulty),
     startDate: goal.startDate,
     deadline: goal.deadline,
     dailyGoalHours: normalizeDailyGoalHours(goal.dailyGoalHours),

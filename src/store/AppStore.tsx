@@ -518,7 +518,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         });
       }
       if (deletedGoal) {
-        saveGoal(userId, deletedGoal.goal, state.data.tasks).catch((error: unknown) => {
+        saveGoal(userId, deletedGoal.goal).catch((error: unknown) => {
           dispatch({ type: "SYNC_FAILED", error: getErrorMessage(error, "Could not restore goal") });
         });
         Promise.all(deletedGoal.affectedTasks.map((task) => saveTask(userId, task))).catch((error: unknown) => {
@@ -548,7 +548,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const userId = requireUserId(state);
       dispatch({ type: "ADD_GOAL", goal });
-      saveGoal(userId, goal, state.data.tasks).catch((error: unknown) => {
+      saveGoal(userId, goal).catch((error: unknown) => {
         dispatch({ type: "SYNC_FAILED", error: getErrorMessage(error, "Could not add goal") });
       });
     } catch (error: unknown) {
@@ -575,7 +575,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const userId = requireUserId(state);
       dispatch({ type: "UPDATE_GOAL", id, input, updatedAt });
-      saveGoal(userId, goal, state.data.tasks).catch((error: unknown) => {
+      saveGoal(userId, goal).catch((error: unknown) => {
         dispatch({ type: "SYNC_FAILED", error: getErrorMessage(error, "Could not update goal") });
       });
     } catch (error: unknown) {
@@ -602,7 +602,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const userId = requireUserId(state);
       dispatch({ type: "UPDATE_GOAL_PROGRESS", id, progress });
-      saveGoal(userId, goal, state.data.tasks).catch((error: unknown) => {
+      saveGoal(userId, goal).catch((error: unknown) => {
         dispatch({ type: "SYNC_FAILED", error: getErrorMessage(error, "Could not update goal progress") });
       });
     } catch (error: unknown) {

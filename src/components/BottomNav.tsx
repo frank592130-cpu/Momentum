@@ -22,22 +22,14 @@ interface Props {
 }
 
 export const BottomNav = React.memo(function BottomNav({ activeTab, onTabPress }: Props) {
-  const { colors, spacing, radius } = useAppTheme();
-  const styles = useMemo(() => createStyles(colors, spacing, radius), [colors, spacing, radius]);
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.pill}>
       {TABS.map((tab) => {
         const active = activeTab === tab.id;
-        return (
-          <NavTab
-            key={tab.id}
-            tab={tab}
-            active={active}
-            styles={styles}
-            colors={colors}
-            onPress={() => onTabPress(tab.id)}
-          />
-        );
+        return <NavTab key={tab.id} tab={tab} active={active} styles={styles} onPress={() => onTabPress(tab.id)} />;
       })}
     </View>
   );
@@ -47,17 +39,16 @@ function NavTab({
   tab,
   active,
   styles,
-  colors,
   onPress,
 }: {
   tab: { id: TabId; icon: MomentumIconName; label: string };
   active: boolean;
   styles: ReturnType<typeof createStyles>;
-  colors: ThemeColors;
   onPress: () => void;
 }) {
   const progress = useRef(new Animated.Value(active ? 1 : 0)).current;
   const { pressScale, onPressIn, onPressOut } = usePressScale(0.94);
+  const iconColor = active ? styles.iconActive.color : styles.iconInactive.color;
 
   useEffect(() => {
     Animated.timing(progress, {
@@ -77,9 +68,25 @@ function NavTab({
       activeOpacity={0.8}
     >
       <Animated.View
+        pointerEvents="none"
         style={[
-          styles.iconWrap,
-          active ? styles.iconActive : styles.iconInactive,
+          styles.activeIndicator,
+          {
+            opacity: progress,
+            transform: [
+              {
+                scale: progress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.55, 1],
+                }),
+              },
+            ],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.icon,
           {
             transform: [
               {
@@ -92,21 +99,14 @@ function NavTab({
           },
         ]}
       >
-        <MomentumIcon
-          name={tab.icon}
-          size={24}
-          color={active ? colors.accent : colors.textSecondary}
-          strokeWidth={active ? 2.8 : 2.35}
-        />
+        <MomentumIcon name={tab.icon} size={30} color={iconColor} strokeWidth={2.45} />
       </Animated.View>
-      <Animated.Text style={[styles.label, active ? styles.labelActive : styles.labelInactive]}>
-        {tab.label}
-      </Animated.Text>
+      <Animated.Text style={[styles.label, active ? styles.labelActive : styles.labelInactive]}>{tab.label}</Animated.Text>
     </AnimatedTouchableOpacity>
   );
 }
 
-function createStyles(colors: ThemeColors, spacingValue: typeof import("../theme").spacing, radiusValue: typeof import("../theme").radius) {
+function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     pill: {
       flexDirection: "row",
@@ -134,21 +134,24 @@ function createStyles(colors: ThemeColors, spacingValue: typeof import("../theme
       paddingVertical: 6,
       position: "relative",
     },
-    iconWrap: {
-      width: 28,
-      height: 24,
+    activeIndicator: {
+      position: "absolute",
+    },
+    icon: {
+      width: 32,
+      height: 32,
       alignItems: "center",
       justifyContent: "center",
     },
     iconActive: {
-      opacity: 1,
+      color: colors.accent,
     },
     iconInactive: {
-      opacity: 1,
+      color: colors.textSecondary,
     },
     label: {
       fontSize: 9,
-      letterSpacing: 0.3,
+      letterSpacing: 0,
       fontWeight: "700",
     },
     labelActive: {

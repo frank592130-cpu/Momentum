@@ -4,7 +4,7 @@ import { EmptyState, StatCard } from "../components/Base";
 import { TimelineItem } from "../components/Cards";
 import { MotionPanel } from "../components/Motion";
 import { WHEEL_HEIGHT, WHEEL_ITEM_HEIGHT, WheelColumn } from "../components/WheelPicker";
-import { addDays, formatDateLabel, formatDateTitle, parseDateKey, toDateKey } from "../domain/date";
+import { formatDateLabel, formatDateTitle, parseDateKey, toDateKey } from "../domain/date";
 import {
   getCompletedDurationHours,
   getCompletionRate,
@@ -68,6 +68,43 @@ export function PlannerScreen() {
     const customTags = data.tasks.map((task) => task.tag).filter(Boolean);
     return Array.from(new Set([...TAGS, ...customTags]));
   }, [data.tasks]);
+
+  const renameTag = (from: string, to: string) => {
+    const nextTag = to.trim();
+    if (!nextTag || nextTag === from) return;
+    data.tasks
+      .filter((task) => task.tag === from)
+      .forEach((task) => {
+        actions.updateTask(task.id, {
+          title: task.title,
+          tag: nextTag,
+          date: task.date,
+          time: task.time,
+          duration: task.duration,
+          energy: task.energy,
+          goalIds: task.goalIds,
+        });
+      });
+    setDraft((prev) => ({ ...prev, tag: prev.tag === from ? nextTag : prev.tag }));
+  };
+
+  const deleteTag = (tag: string) => {
+    const fallbackTag = tagOptions.find((option) => option !== tag) ?? "Focus";
+    data.tasks
+      .filter((task) => task.tag === tag)
+      .forEach((task) => {
+        actions.updateTask(task.id, {
+          title: task.title,
+          tag: fallbackTag,
+          date: task.date,
+          time: task.time,
+          duration: task.duration,
+          energy: task.energy,
+          goalIds: task.goalIds,
+        });
+      });
+    setDraft((prev) => ({ ...prev, tag: prev.tag === tag ? fallbackTag : prev.tag }));
+  };
 
   const resetTaskForm = () => {
     setDraft({ title: "", time: "09:00", endTime: "09:30", tag: tagOptions[0] ?? "Focus", goalIds: [] });
@@ -220,6 +257,8 @@ export function PlannerScreen() {
       error={formError}
       onClose={resetTaskForm}
       onChange={setDraft}
+      onRenameTag={renameTag}
+      onDeleteTag={deleteTag}
       onSave={saveTask}
       onDelete={editingTaskId ? () => {
         actions.deleteTask(editingTaskId);
@@ -239,7 +278,7 @@ function MonthCalendar({
   markedDates: Set<string>;
   onSelect: (date: string) => void;
 }) {
-  const { colors, spacing, radius, typography } = useAppTheme();
+  const { colors, spacing, radius } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, spacing, radius), [colors, spacing, radius]);
   const [visibleMonth, setVisibleMonth] = useState(() => selectedDate.slice(0, 7));
 
@@ -324,6 +363,8 @@ function TaskEditorModal({
   error,
   onClose,
   onChange,
+  onRenameTag,
+  onDeleteTag,
   onSave,
   onDelete,
 }: {
@@ -335,6 +376,8 @@ function TaskEditorModal({
   error: string;
   onClose: () => void;
   onChange: React.Dispatch<React.SetStateAction<{ title: string; time: string; endTime: string; tag: string; goalIds: string[] }>>;
+  onRenameTag: (from: string, to: string) => void;
+  onDeleteTag: (tag: string) => void;
   onSave: () => void;
   onDelete?: () => void;
 }) {
@@ -374,6 +417,8 @@ function TaskEditorModal({
                   options={tagOptions}
                   value={draft.tag}
                   onChange={(tag) => onChange((prev) => ({ ...prev, tag }))}
+                  onRename={onRenameTag}
+                  onDelete={onDeleteTag}
                 />
                 <MultiGoalSelector
                   goals={goals}
@@ -563,15 +608,21 @@ function TagSelector({
   options,
   value,
   onChange,
+  onRename,
+  onDelete,
 }: {
   options: string[];
   value: string;
   onChange: (value: string) => void;
+  onRename: (from: string, to: string) => void;
+  onDelete: (value: string) => void;
 }) {
   const { colors, spacing, radius, typography } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, spacing, radius), [colors, spacing, radius]);
   const [isAddingCustom, setIsAddingCustom] = useState(false);
   const [customTag, setCustomTag] = useState("");
+  const [editingTag, setEditingTag] = useState<string | undefined>();
+  const [editingValue, setEditingValue] = useState("");
   const displayOptions = useMemo(() => {
     const selectedTag = value.trim();
     return Array.from(new Set([...options, ...(selectedTag ? [selectedTag] : [])]));
@@ -583,6 +634,25 @@ function TagSelector({
     setCustomTag("");
     setIsAddingCustom(false);
   };
+  const startEditing = (tag: string) => {
+    setEditingTag(tag);
+    setEditingValue(tag);
+    setIsAddingCustom(false);
+    setCustomTag("");
+  };
+  const commitEdit = () => {
+    if (!editingTag) return;
+    const nextTag = editingValue.trim();
+    if (nextTag) onRename(editingTag, nextTag);
+    setEditingTag(undefined);
+    setEditingValue("");
+  };
+  const removeEditingTag = () => {
+    if (!editingTag) return;
+    onDelete(editingTag);
+    setEditingTag(undefined);
+    setEditingValue("");
+  };
 
   return (
     <View style={styles.segmentGroup}>
@@ -593,10 +663,19 @@ function TagSelector({
           return (
             <TouchableOpacity
               key={option}
+              onLongPress={() => startEditing(option)}
               onPress={() => {
+                if (active) {
+                  startEditing(option);
+                  return;
+                }
                 onChange(option);
                 setIsAddingCustom(false);
                 setCustomTag("");
+                if (editingTag !== option) {
+                  setEditingTag(undefined);
+                  setEditingValue("");
+                }
               }}
               style={[styles.segmentButton, active && styles.segmentButtonActive]}
             >
@@ -629,22 +708,31 @@ function TagSelector({
           />
           <TouchableOpacity
             onPress={commitCustomTag}
-            style={[styles.customTagActionButton, styles.customTagConfirmButton]}
+            style={styles.customTagPlainButton}
             activeOpacity={0.75}
             accessibilityLabel="Save custom tag"
           >
-            <Text style={[styles.customTagActionText, styles.customTagConfirmText]}>+</Text>
+            <Text style={styles.customTagPlainText}>Add</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => {
-              setCustomTag("");
-              setIsAddingCustom(false);
-            }}
-            style={styles.customTagActionButton}
-            activeOpacity={0.75}
-            accessibilityLabel="Cancel custom tag"
-          >
-            <Text style={styles.customTagActionText}>x</Text>
+        </View>
+      ) : null}
+      {editingTag ? (
+        <View style={styles.customTagRow}>
+          <TextInput
+            value={editingValue}
+            onChangeText={setEditingValue}
+            onSubmitEditing={commitEdit}
+            placeholder="Edit tag"
+            placeholderTextColor={colors.textTertiary}
+            style={[styles.input, styles.customTagInput]}
+            autoFocus
+            returnKeyType="done"
+          />
+          <TouchableOpacity onPress={commitEdit} style={[styles.customTagActionButton, styles.customTagConfirmButton]} activeOpacity={0.75}>
+            <Text style={[styles.customTagActionText, styles.customTagConfirmText]}>Save</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={removeEditingTag} style={[styles.customTagActionButton, styles.customTagDeleteButton]} activeOpacity={0.75}>
+            <Text style={[styles.customTagActionText, styles.customTagDeleteText]}>Delete</Text>
           </TouchableOpacity>
         </View>
       ) : null}
@@ -879,8 +967,16 @@ function createStyles(colors: ThemeColors, spacingValue: typeof import("../theme
       gap: spacingValue.sm,
     },
     customTagInput: { flex: 1 },
+    customTagPlainButton: {
+      minWidth: 42,
+      minHeight: 42,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: spacingValue.xs,
+    },
+    customTagPlainText: { color: colors.accent, fontSize: 13, fontWeight: "800" },
     customTagActionButton: {
-      width: 42,
+      minWidth: 58,
       minHeight: 42,
       alignItems: "center",
       justifyContent: "center",
@@ -893,8 +989,13 @@ function createStyles(colors: ThemeColors, spacingValue: typeof import("../theme
       borderColor: colors.accent,
       backgroundColor: colors.accentSubtle,
     },
-    customTagActionText: { color: colors.textSecondary, fontSize: 16, fontWeight: "800", lineHeight: 18 },
-    customTagConfirmText: { color: colors.accent, fontSize: 20, lineHeight: 20 },
+    customTagDeleteButton: {
+      borderColor: colors.danger,
+      backgroundColor: colors.dangerSubtle,
+    },
+    customTagActionText: { color: colors.textSecondary, fontSize: 12, fontWeight: "800", lineHeight: 16 },
+    customTagConfirmText: { color: colors.accent },
+    customTagDeleteText: { color: colors.danger },
     workloadCard: {
       backgroundColor: colors.bgCard,
       borderWidth: 1,

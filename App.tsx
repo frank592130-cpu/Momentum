@@ -53,7 +53,7 @@ function MomentumApp() {
     if (!isReady) return <LoadingState />;
     switch (activeTab) {
       case "dashboard":
-        return <DashboardScreen onGoalPress={handleGoalPress} />;
+        return <DashboardScreen />;
       case "planner":
         return <PlannerScreen />;
       case "goals":
@@ -69,7 +69,7 @@ function MomentumApp() {
       case "account":
         return <AccountScreen onBack={() => setActiveTab("dashboard")} />;
       default:
-        return <DashboardScreen onGoalPress={handleGoalPress} />;
+        return <DashboardScreen />;
     }
   };
 

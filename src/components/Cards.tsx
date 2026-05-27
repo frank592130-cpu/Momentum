@@ -140,7 +140,6 @@ interface TimelineItemProps {
   task: Task;
   isLast?: boolean;
   onToggle?: (id: string) => void;
-  onDelete?: (id: string) => void;
   onEdit?: (task: Task) => void;
   goalTitles?: string[];
 }
@@ -149,7 +148,6 @@ export const TimelineItem = React.memo(function TimelineItem({
   task,
   isLast,
   onToggle,
-  onDelete,
   onEdit,
   goalTitles = [],
 }: TimelineItemProps) {

@@ -42,6 +42,41 @@ export function GoalsScreen({ onGoalPress }: Props) {
     return Array.from(new Set(["Personal", "Work", "Health", "Learning", ...categories]));
   }, [data.goals]);
 
+  const renameCategory = (from: string, to: string) => {
+    const nextCategory = to.trim();
+    if (!nextCategory || nextCategory === from) return;
+    data.goals
+      .filter((goal) => goal.category === from)
+      .forEach((goal) => {
+        actions.updateGoal(goal.id, {
+          title: goal.title,
+          category: nextCategory,
+          startDate: goal.startDate,
+          deadline: goal.deadline,
+          dailyGoalHours: goal.dailyGoalHours,
+          progress: goal.progress,
+        });
+      });
+    setDraft((prev) => ({ ...prev, category: prev.category === from ? nextCategory : prev.category }));
+  };
+
+  const deleteCategory = (category: string) => {
+    const fallbackCategory = categoryOptions.find((option) => option !== category) ?? "Personal";
+    data.goals
+      .filter((goal) => goal.category === category)
+      .forEach((goal) => {
+        actions.updateGoal(goal.id, {
+          title: goal.title,
+          category: fallbackCategory,
+          startDate: goal.startDate,
+          deadline: goal.deadline,
+          dailyGoalHours: goal.dailyGoalHours,
+          progress: goal.progress,
+        });
+      });
+    setDraft((prev) => ({ ...prev, category: prev.category === category ? fallbackCategory : prev.category }));
+  };
+
   const resetGoalForm = () => {
     setDraft({
       title: "",
@@ -81,13 +116,13 @@ export function GoalsScreen({ onGoalPress }: Props) {
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
       <View>
         <Text style={[typography.label, styles.label]}>Goal Tracker</Text>
-        <Text style={styles.title}>Active Goals</Text>
+        <Text style={styles.title}>All Goals</Text>
       </View>
 
       <View>
        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 10, paddingBottom: 0.5 }}>
         <View>
-          <Text style={{ fontSize: 30, fontWeight: 'bold', color: colors.textPrimary, paddingBottom: 20 }}>All Goals</Text>
+          
         </View>
         <TouchableOpacity
           style={styles.plusGoalButton}
@@ -128,6 +163,8 @@ export function GoalsScreen({ onGoalPress }: Props) {
       error={formError}
       onClose={resetGoalForm}
       onChange={setDraft}
+      onRenameCategory={renameCategory}
+      onDeleteCategory={deleteCategory}
       onSave={saveGoal}
     />
     </>
@@ -162,6 +199,8 @@ function GoalEditorModal({
   error,
   onClose,
   onChange,
+  onRenameCategory,
+  onDeleteCategory,
   onSave,
   onDelete,
 }: {
@@ -174,6 +213,8 @@ function GoalEditorModal({
   onChange: React.Dispatch<
     React.SetStateAction<{ title: string; category: string; startDate: string; deadline: string; dailyGoalHours: number }>
   >;
+  onRenameCategory: (from: string, to: string) => void;
+  onDeleteCategory: (category: string) => void;
   onSave: () => void;
   onDelete?: () => void;
 }) {
@@ -208,6 +249,8 @@ function GoalEditorModal({
                   options={categoryOptions}
                   value={draft.category}
                   onChange={(category) => onChange((prev) => ({ ...prev, category }))}
+                  onRename={onRenameCategory}
+                  onDelete={onDeleteCategory}
                 />
                 <DailyTargetSelector
                   value={draft.dailyGoalHours}
@@ -321,15 +364,21 @@ function CategorySelector({
   options,
   value,
   onChange,
+  onRename,
+  onDelete,
 }: {
   options: string[];
   value: string;
   onChange: (value: string) => void;
+  onRename: (from: string, to: string) => void;
+  onDelete: (value: string) => void;
 }) {
   const { colors, spacing, radius, typography } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, spacing, radius), [colors, spacing, radius]);
   const [isAddingCustom, setIsAddingCustom] = useState(false);
   const [customCategory, setCustomCategory] = useState("");
+  const [editingCategory, setEditingCategory] = useState<string | undefined>();
+  const [editingValue, setEditingValue] = useState("");
 
   const displayOptions = useMemo(() => {
     const selectedCategory = value.trim();
@@ -343,6 +392,25 @@ function CategorySelector({
     setCustomCategory("");
     setIsAddingCustom(false);
   };
+  const startEditing = (category: string) => {
+    setEditingCategory(category);
+    setEditingValue(category);
+    setIsAddingCustom(false);
+    setCustomCategory("");
+  };
+  const commitEdit = () => {
+    if (!editingCategory) return;
+    const nextCategory = editingValue.trim();
+    if (nextCategory) onRename(editingCategory, nextCategory);
+    setEditingCategory(undefined);
+    setEditingValue("");
+  };
+  const removeEditingCategory = () => {
+    if (!editingCategory) return;
+    onDelete(editingCategory);
+    setEditingCategory(undefined);
+    setEditingValue("");
+  };
 
   return (
     <View style={styles.categoryGroup}>
@@ -353,10 +421,19 @@ function CategorySelector({
           return (
             <TouchableOpacity
               key={option}
+              onLongPress={() => startEditing(option)}
               onPress={() => {
+                if (active) {
+                  startEditing(option);
+                  return;
+                }
                 onChange(option);
                 setIsAddingCustom(false);
                 setCustomCategory("");
+                if (editingCategory !== option) {
+                  setEditingCategory(undefined);
+                  setEditingValue("");
+                }
               }}
               style={[styles.categoryChip, active && styles.categoryChipActive]}
             >
@@ -378,20 +455,41 @@ function CategorySelector({
         ) : null}
       </ScrollView>
       {isAddingCustom ? (
-        <TextInput
-          value={customCategory}
-          onChangeText={setCustomCategory}
-          onSubmitEditing={commitCustomCategory}
-          onBlur={() => {
-            if (customCategory.trim()) commitCustomCategory();
-            else setIsAddingCustom(false);
-          }}
-          placeholder="New category"
-          placeholderTextColor={colors.textTertiary}
-          style={[styles.input, styles.customCategoryInput]}
-          autoFocus
-          returnKeyType="done"
-        />
+        <View style={styles.customCategoryRow}>
+          <TextInput
+            value={customCategory}
+            onChangeText={setCustomCategory}
+            onSubmitEditing={commitCustomCategory}
+            placeholder="New category"
+            placeholderTextColor={colors.textTertiary}
+            style={[styles.input, styles.customCategoryInput]}
+            autoFocus
+            returnKeyType="done"
+          />
+          <TouchableOpacity onPress={commitCustomCategory} style={styles.customCategoryPlainButton} activeOpacity={0.75}>
+            <Text style={styles.customCategoryPlainText}>Add</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+      {editingCategory ? (
+        <View style={styles.customCategoryRow}>
+          <TextInput
+            value={editingValue}
+            onChangeText={setEditingValue}
+            onSubmitEditing={commitEdit}
+            placeholder="Edit category"
+            placeholderTextColor={colors.textTertiary}
+            style={[styles.input, styles.customCategoryInput]}
+            autoFocus
+            returnKeyType="done"
+          />
+          <TouchableOpacity onPress={commitEdit} style={[styles.customCategoryActionButton, styles.customCategoryConfirmButton]} activeOpacity={0.75}>
+            <Text style={[styles.customCategoryActionText, styles.customCategoryConfirmText]}>Save</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={removeEditingCategory} style={[styles.customCategoryActionButton, styles.customCategoryDeleteButton]} activeOpacity={0.75}>
+            <Text style={[styles.customCategoryActionText, styles.customCategoryDeleteText]}>Delete</Text>
+          </TouchableOpacity>
+        </View>
       ) : null}
     </View>
   );
@@ -570,11 +668,46 @@ function createStyles(colors: ThemeColors, spacingValue: typeof import("../theme
       backgroundColor: colors.bgElevated,
     },
     addCategoryButtonText: { color: colors.accent, fontSize: 20, fontWeight: "800", lineHeight: 20 },
-    customCategoryInput: {
+    customCategoryRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacingValue.sm,
       marginTop: spacingValue.sm,
+    },
+    customCategoryInput: {
+      flex: 1,
       borderColor: colors.accent,
       backgroundColor: colors.accentSubtle,
     },
+    customCategoryPlainButton: {
+      minWidth: 42,
+      minHeight: 42,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: spacingValue.xs,
+    },
+    customCategoryPlainText: { color: colors.accent, fontSize: 13, fontWeight: "800" },
+    customCategoryActionButton: {
+      minWidth: 58,
+      minHeight: 42,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: radiusValue.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.bgElevated,
+    },
+    customCategoryConfirmButton: {
+      borderColor: colors.accent,
+      backgroundColor: colors.accentSubtle,
+    },
+    customCategoryDeleteButton: {
+      borderColor: colors.danger,
+      backgroundColor: colors.dangerSubtle,
+    },
+    customCategoryActionText: { color: colors.textSecondary, fontSize: 12, fontWeight: "800", lineHeight: 16 },
+    customCategoryConfirmText: { color: colors.accent },
+    customCategoryDeleteText: { color: colors.danger },
     dateWheelPanel: {
       gap: spacingValue.md,
       borderWidth: 1,

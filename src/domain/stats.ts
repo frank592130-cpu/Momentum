@@ -7,10 +7,7 @@ import {
   GoalProgress,
   RiskLevel,
   Task,
-  WorkloadSlice,
 } from "./models";
-
-
 
 export function clamp(value: number, min = 0, max = 100) {
   return Math.min(max, Math.max(min, value));
@@ -81,16 +78,8 @@ function getCompletedDateKey(task: Task) {
   return toDateKey(new Date(task.completedAt));
 }
 
-function getTaskCreatedDateKey(task: Task) {
-  return toDateKey(new Date(task.createdAt));
-}
-
 function isTaskDoneBy(task: Task, dateKey: string) {
   return task.done && diffInDays(getCompletedDateKey(task), dateKey) >= 0;
-}
-
-function isTaskPlannedBeforeDate(task: Task) {
-  return diffInDays(getTaskCreatedDateKey(task), task.date) >= 1;
 }
 
 function getPlannedTaskMinutes(tasks: Task[]) {
@@ -105,15 +94,6 @@ function getCompletedFocusHoursForDate(tasks: Task[], dateKey: string, asOfDateK
   return round(getCompletedTaskMinutes(getTasksForDate(tasks, dateKey), asOfDateKey) / 60, 1);
 }
 
-function getRecentGoalDates(goal: Goal, todayKey: string) {
-  return lastNDays(7, todayKey).filter(
-    (dateKey) =>
-      diffInDays(goal.startDate, dateKey) >= 0 &&
-      diffInDays(dateKey, todayKey) >= 0 &&
-      diffInDays(dateKey, goal.deadline) >= 0,
-  );
-}
-
 export function calculateGoalMetrics(goal: Goal, tasks: Task[], todayKey = toDateKey()): GoalMetrics {
   // 基本信息
   const linkedTasks = getTasksForGoal(tasks, goal.id);
@@ -121,14 +101,13 @@ export function calculateGoalMetrics(goal: Goal, tasks: Task[], todayKey = toDat
   const progress = Math.round(clamp(goal.progress));
   const plannedLinkedMinutes = getPlannedTaskMinutes(linkedTasks);
   const completedLinkedMinutes = getCompletedTaskMinutes(linkedTasks, todayKey);
-  const totalDays = Math.max(1, diffInDays(goal.startDate, goal.deadline));
   const daysLeft = diffInDays(todayKey, goal.deadline);
   const completedLinkedTaskCount = linkedTasks.filter((task) => isTaskDoneBy(task, todayKey)).length;
 
   // 新的分析指標
   const streak = calculateGoalStreak(tasks, goal.id, dailyTargetHours, todayKey);
   const weekly = getGoalWeeklyProgress(tasks, goal.id, dailyTargetHours, todayKey);
-  const velocity = getGoalProgressVelocity(tasks, goal.id, dailyTargetHours, todayKey);
+  const velocity = getGoalProgressVelocity(tasks, goal.id, todayKey);
   
   // 今天是否達成
   const todayTasks = getTasksForDate(linkedTasks, todayKey);
@@ -169,18 +148,6 @@ export function calculateGoalMetrics(goal: Goal, tasks: Task[], todayKey = toDat
 
 export function enrichGoals(goals: Goal[], tasks: Task[], todayKey = toDateKey()) {
   return goals.map((goal) => calculateGoalMetrics(goal, tasks, todayKey));
-}
-
-function getWorkloadDistribution(tasks: Task[]): WorkloadSlice[] {
-  const minutesByTag = tasks.reduce<Record<string, number>>((acc, task) => {
-    acc[task.tag] = (acc[task.tag] || 0) + task.duration;
-    return acc;
-  }, {});
-  const total = Object.values(minutesByTag).reduce((sum, value) => sum + value, 0);
-  if (total === 0) return [];
-  return Object.entries(minutesByTag)
-    .map(([label, minutes]) => ({ label, minutes, pct: Math.round((minutes / total) * 100) }))
-    .sort((a, b) => b.minutes - a.minutes);
 }
 
 export function getTrendPercent(current: number, previous: number) {
@@ -275,7 +242,7 @@ export function getGoalWeeklyProgress(tasks: Task[], goalId: string, dailyGoalHo
   };
 }
 
-export function getGoalProgressVelocity(tasks: Task[], goalId: string, dailyGoalHours: number, todayKey = toDateKey()) {
+export function getGoalProgressVelocity(tasks: Task[], goalId: string, todayKey = toDateKey()) {
   const goalTasks = getTasksForGoal(tasks, goalId);
   const thisWeekHours = lastNDays(7, todayKey).reduce((sum, dateKey) => sum + getGoalCompletedHoursForDate(goalTasks, dateKey), 0);
   const lastWeekHours = dateRange(addDays(todayKey, -13), addDays(todayKey, -7)).reduce((sum, dateKey) => sum + getGoalCompletedHoursForDate(goalTasks, dateKey), 0);
@@ -326,7 +293,7 @@ export function buildGoalProgressMap(tasks: Task[], goals: Goal[], todayKey = to
     const targetHours = normalizeDailyGoalHours(goal.dailyGoalHours, 8.5);
     const streak = calculateGoalStreak(tasks, goal.id, targetHours, todayKey);
     const weekly = getGoalWeeklyProgress(tasks, goal.id, targetHours, todayKey);
-    const velocity = getGoalProgressVelocity(tasks, goal.id, targetHours, todayKey);
+    const velocity = getGoalProgressVelocity(tasks, goal.id, todayKey);
     acc[goal.id] = {
       goalId: goal.id,
       currentStreak: streak.current,
@@ -404,23 +371,6 @@ export function generateAnalyticsInsights(
   });
 
   return insights;
-}
-
-function getBestWeekLabel(tasks: Task[], todayKey: string) {
-  const chunks = [
-    { label: "This week", end: todayKey },
-    { label: "Last week", end: addDays(todayKey, -7) },
-    { label: "2 weeks ago", end: addDays(todayKey, -14) },
-    { label: "3 weeks ago", end: addDays(todayKey, -21) },
-  ];
-  const best = chunks
-    .map((chunk) => {
-      const days = lastNDays(7, chunk.end);
-      const hours = days.reduce((sum, dateKey) => sum + getCompletedFocusHours(getTasksForDate(tasks, dateKey)), 0);
-      return { ...chunk, hours };
-    })
-    .sort((a, b) => b.hours - a.hours)[0];
-  return best?.label ?? "No data";
 }
 
 export function getAnalyticsData(goals: Goal[], tasks: Task[], todayKey = toDateKey()): AnalyticsData {

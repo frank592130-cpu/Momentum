@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
-import Svg, { Circle, Polyline, Rect } from "react-native-svg";
+import Svg, { Circle, G, Polyline, Rect } from "react-native-svg";
 import { useAppTheme } from "../theme";
 import { motionCurves } from "./Motion";
 
@@ -149,6 +149,59 @@ export function SparkLine({ data, color, width = 80, height = 32 }: SparkLinePro
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+    </Svg>
+  );
+}
+
+interface PieSlice {
+  label: string;
+  value: number;
+  color: string;
+}
+
+interface DonutChartProps {
+  data: PieSlice[];
+  size?: number;
+  strokeWidth?: number;
+  emptyColor?: string;
+}
+
+export function DonutChart({ data, size = 106, strokeWidth = 18, emptyColor }: DonutChartProps) {
+  const { colors } = useAppTheme();
+  const safeData = data.filter((item) => item.value > 0);
+  const total = safeData.reduce((sum, item) => sum + item.value, 0);
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const center = size / 2;
+  let offset = 0;
+
+  return (
+    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <G rotation="-90" origin={`${center}, ${center}`}>
+        <Circle cx={center} cy={center} r={radius} fill="none" stroke={emptyColor ?? colors.border} strokeWidth={strokeWidth} />
+        {total > 0
+          ? safeData.map((item) => {
+              const length = (item.value / total) * circumference;
+              const dash = `${Math.max(0, length - 2)} ${circumference}`;
+              const dashOffset = -offset;
+              offset += length;
+              return (
+                <Circle
+                  key={item.label}
+                  cx={center}
+                  cy={center}
+                  r={radius}
+                  fill="none"
+                  stroke={item.color}
+                  strokeWidth={strokeWidth}
+                  strokeDasharray={dash}
+                  strokeDashoffset={dashOffset}
+                  strokeLinecap="round"
+                />
+              );
+            })
+          : null}
+      </G>
     </Svg>
   );
 }

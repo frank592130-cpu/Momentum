@@ -23,8 +23,8 @@ export const WheelColumn = React.memo(
       onChangeRef.current = onChange;
     }, [onChange]);
 
-    const { colors, spacing, radius } = useAppTheme();
-    const styles = useMemo(() => createStyles(colors, spacing, radius), [colors, spacing, radius]);
+    const { colors, spacing } = useAppTheme();
+    const styles = useMemo(() => createStyles(colors, spacing), [colors, spacing]);
     const scrollRef = useRef<FlatList<string>>(null);
     const isRecenteringRef = useRef(false);
 
@@ -130,7 +130,7 @@ export const WheelColumn = React.memo(
   (prev, next) => prev.value === next.value && prev.values === next.values && prev.loop === next.loop,
 );
 
-function createStyles(colors: ThemeColors, spacingValue: typeof import("../theme").spacing, radiusValue: typeof import("../theme").radius) {
+function createStyles(colors: ThemeColors, spacingValue: typeof import("../theme").spacing) {
   return StyleSheet.create({
     wheel: {
       height: WHEEL_HEIGHT,

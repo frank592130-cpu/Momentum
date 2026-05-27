@@ -15,8 +15,8 @@ interface ProfileButtonProps {
 }
 
 export function ProfileButton({ onNavigate }: ProfileButtonProps) {
-  const { colors, spacing, radius } = useAppTheme();
-  const styles = useMemo(() => createStyles(colors, spacing, radius), [colors, spacing, radius]);
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { profile, isAuthenticated } = useAuth();
 
   const avatarLetter = profile?.name?.[0]?.toUpperCase() ?? "M";
@@ -39,11 +39,7 @@ export function ProfileButton({ onNavigate }: ProfileButtonProps) {
   );
 }
 
-function createStyles(
-  colors: ThemeColors,
-  spacingValue: typeof import("../theme").spacing,
-  radiusValue: typeof import("../theme").radius,
-) {
+function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     avatarButton: {
       width: 38,

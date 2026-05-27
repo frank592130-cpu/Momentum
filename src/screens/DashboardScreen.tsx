@@ -11,15 +11,10 @@ import {
   getTasksForDate,
   getTotalDurationHours,
 } from "../domain/stats";
-import { GoalMetrics } from "../domain/models";
 import { useAppActions, useAppState } from "../store/AppStore";
 import { ThemeColors, useAppTheme } from "../theme";
 
-interface Props {
-  onGoalPress: (goal: GoalMetrics) => void;
-}
-
-export function DashboardScreen({ onGoalPress }: Props) {
+export function DashboardScreen() {
   const { colors, spacing, radius, typography } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, spacing, radius), [colors, spacing, radius]);
   const { data } = useAppState();
@@ -81,7 +76,6 @@ export function DashboardScreen({ onGoalPress }: Props) {
                 isLast={index === todayTasks.length - 1}
                 goalTitles={task.goalIds.map((goalId) => goalTitleById[goalId]).filter(Boolean)}
                 onToggle={actions.toggleTask}
-                onDelete={actions.deleteTask}
               />
             ))
           ) : (

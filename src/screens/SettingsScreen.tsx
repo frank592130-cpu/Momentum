@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Switch } from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Switch } from "react-native";
 import { MomentumIcon, MomentumIconName } from "../components/Icons";
 import { ThemePreference } from "../domain/models";
-import { normalizeDailyGoalHours } from "../domain/stats";
-import { isFirebaseConfigured } from "../services/firebase";
 import { scheduleMomentumTestNotification } from "../services/notifications";
 import { useAppActions, useAppState } from "../store/AppStore";
 import { ThemeColors, useAppTheme } from "../theme";
@@ -11,18 +9,7 @@ import { ThemeColors, useAppTheme } from "../theme";
 const THEME_OPTIONS: ThemePreference[] = ["system", "light", "dark"];
 const REMINDER_LEAD_OPTIONS = [0, 5, 10, 15, 30, 60];
 
-function isTimeValue(value: string) {
-  if (!/^\d{2}:\d{2}$/.test(value)) return false;
-  const [hour, minute] = value.split(":").map(Number);
-  return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
-}
-
-function timeToMinutes(value: string) {
-  const [hour, minute] = value.split(":").map(Number);
-  return hour * 60 + minute;
-}
-
-type SettingsRoute = "main" | "theme" | "notifications" | "automation" | "planner" | "cloud" | "about";
+type SettingsRoute = "main" | "theme" | "notifications" | "automation" | "about";
 type SettingsDestination = "account";
 
 interface SettingsScreenProps {
@@ -54,8 +41,6 @@ export function SettingsScreen({ onNavigate, onSubRouteChange }: SettingsScreenP
           {activeRoute === "theme" && <ThemeSettings />}
           {activeRoute === "notifications" && <NotificationSettings />}
           {activeRoute === "automation" && <AutomationSettings />}
-          {activeRoute === "planner" && <PlannerSettings onOpenCloud={() => setActiveRoute("cloud")} />}
-          {activeRoute === "cloud" && <CloudSettings />}
           {activeRoute === "about" && <AboutSettings />}
         </ScrollView>
       </View>
@@ -79,10 +64,6 @@ export function SettingsScreen({ onNavigate, onSubRouteChange }: SettingsScreenP
           <ListItem icon="notifications" title="Notifications" onPress={() => setActiveRoute("notifications")} />
           <View style={styles.divider} />
           <ListItem icon="automation" title="Automation" onPress={() => setActiveRoute("automation")} />
-          <View style={styles.divider} />
-          <ListItem icon="planner" title="Planner" onPress={() => setActiveRoute("planner")} />
-          <View style={styles.divider} />
-          <ListItem icon="cloud" title="Cloud" onPress={() => setActiveRoute("cloud")} />
         </View>
       </View>
 
@@ -225,127 +206,6 @@ function AutomationSettings() {
         value={settings.aiInsights}
         onChange={(aiInsights) => actions.updateSettings({ aiInsights })}
       />
-    </View>
-  );
-}
-
-function PlannerSettings({ onOpenCloud }: { onOpenCloud: () => void }) {
-  const { colors, spacing, radius } = useAppTheme();
-  const styles = useMemo(() => createStyles(colors, spacing, radius), [colors, spacing, radius]);
-  const { data } = useAppState();
-  const actions = useAppActions();
-  const settings = data.settings;
-  const [editing, setEditing] = useState<"workHours" | "goalHours" | undefined>();
-  const [workStart, setWorkStart] = useState(settings.workHoursStart);
-  const [workEnd, setWorkEnd] = useState(settings.workHoursEnd);
-  const [goalHours, setGoalHours] = useState(String(settings.globalDailyGoalHours));
-  const [plannerMessage, setPlannerMessage] = useState("");
-
-  useEffect(() => {
-    setWorkStart(settings.workHoursStart);
-    setWorkEnd(settings.workHoursEnd);
-    setGoalHours(String(settings.globalDailyGoalHours));
-  }, [settings.globalDailyGoalHours, settings.workHoursEnd, settings.workHoursStart]);
-
-  const saveWorkHours = () => {
-    if (!isTimeValue(workStart) || !isTimeValue(workEnd) || timeToMinutes(workStart) >= timeToMinutes(workEnd)) {
-      setPlannerMessage("Use HH:MM times with the end after the start.");
-      return;
-    }
-    actions.updateSettings({ workHoursStart: workStart, workHoursEnd: workEnd });
-    setPlannerMessage("Work hours updated.");
-    setEditing(undefined);
-  };
-
-  const saveGoalHours = () => {
-    const normalized = normalizeDailyGoalHours(Number(goalHours), settings.globalDailyGoalHours);
-    actions.updateSettings({ globalDailyGoalHours: normalized });
-    setGoalHours(String(normalized));
-    setPlannerMessage("Default goal hours updated.");
-    setEditing(undefined);
-  };
-
-  return (
-    <View style={styles.group}>
-      <InfoRow
-        icon="clock"
-        title="Work Hours"
-        subtitle={`${settings.workHoursStart} - ${settings.workHoursEnd}`}
-        onPress={() => {
-          setPlannerMessage("");
-          setEditing(editing === "workHours" ? undefined : "workHours");
-        }}
-      />
-      {editing === "workHours" ? (
-        <View style={styles.inlineEditor}>
-          <View style={styles.inlineInputRow}>
-            <TextInput
-              value={workStart}
-              onChangeText={setWorkStart}
-              placeholder="09:00"
-              placeholderTextColor={colors.textTertiary}
-              style={[styles.input, styles.inlineInput]}
-              keyboardType="numbers-and-punctuation"
-            />
-            <TextInput
-              value={workEnd}
-              onChangeText={setWorkEnd}
-              placeholder="18:00"
-              placeholderTextColor={colors.textTertiary}
-              style={[styles.input, styles.inlineInput]}
-              keyboardType="numbers-and-punctuation"
-            />
-          </View>
-          <TouchableOpacity style={styles.inlineSaveButton} onPress={saveWorkHours} activeOpacity={0.8}>
-            <Text style={styles.inlineSaveText}>Save Work Hours</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
-      <View style={styles.divider} />
-      <InfoRow
-        icon="goals"
-        title="Default Goal Hours"
-        subtitle={`${settings.globalDailyGoalHours} hours for new goals`}
-        onPress={() => {
-          setPlannerMessage("");
-          setEditing(editing === "goalHours" ? undefined : "goalHours");
-        }}
-      />
-      {editing === "goalHours" ? (
-        <View style={styles.inlineEditor}>
-          <TextInput
-            value={goalHours}
-            onChangeText={setGoalHours}
-            placeholder="8.5"
-            placeholderTextColor={colors.textTertiary}
-            style={styles.input}
-            keyboardType="decimal-pad"
-          />
-          <TouchableOpacity style={styles.inlineSaveButton} onPress={saveGoalHours} activeOpacity={0.8}>
-            <Text style={styles.inlineSaveText}>Save Default Hours</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
-      <View style={styles.divider} />
-      <InfoRow icon="cloud" title="Storage" subtitle="Open cloud sync details" onPress={onOpenCloud} />
-      {plannerMessage ? <Text style={styles.inlineMessage}>{plannerMessage}</Text> : null}
-    </View>
-  );
-}
-
-function CloudSettings() {
-  const { colors, spacing, radius } = useAppTheme();
-  const styles = useMemo(() => createStyles(colors, spacing, radius), [colors, spacing, radius]);
-  const { user } = useAppState();
-  const isAuthenticated = Boolean(user);
-
-  return (
-    <View style={styles.group}>
-      <InfoRow icon="cloud" title="Firebase" subtitle={isFirebaseConfigured() ? "Configured" : "Missing web config"} />
-      <View style={styles.divider} />
-      <InfoRow icon="profile" title="Google Auth" subtitle="Available in Account" />
-      <View style={styles.divider} />
-      <InfoRow icon="report" title="Firestore" subtitle={isAuthenticated ? "Realtime sync enabled" : "Sign in to sync"} />
     </View>
   );
 }

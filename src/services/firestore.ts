@@ -189,7 +189,7 @@ function fromGoalDocument(id: string, document: FirestoreGoalDocument): Goal {
   };
 }
 
-function toGoalDocument(goal: Goal, tasks: Task[] = []): FirestoreGoalDocument {
+function toGoalDocument(goal: Goal): FirestoreGoalDocument {
   return {
     title: goal.title,
     targetDate: goal.deadline,
@@ -309,8 +309,8 @@ export async function removeTask(userId: string, taskId: string) {
   await deleteDoc(taskRef(userId, taskId));
 }
 
-export async function saveGoal(userId: string, goal: Goal, tasks: Task[] = []) {
-  await setDoc(goalRef(userId, goal.id), toGoalDocument(goal, tasks), { merge: true });
+export async function saveGoal(userId: string, goal: Goal) {
+  await setDoc(goalRef(userId, goal.id), toGoalDocument(goal), { merge: true });
 }
 
 export async function removeGoal(userId: string, goalId: string) {

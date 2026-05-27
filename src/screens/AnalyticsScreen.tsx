@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-nati
 import { SectionHeader } from "../components/Base";
 import { AnalyticsCard, InsightCard } from "../components/Cards";
 import { lastNDays, toDateKey } from "../domain/date";
-import { getAnalyticsData, getAnalyticsTrends, getAverage, getCompletedFocusHours, getGoalBalanceScore, getTasksForDate, round } from "../domain/stats";
+import { getAnalyticsData, getAnalyticsTrends, getAverage, getCompletedFocusHours, getTasksForDate, round } from "../domain/stats";
 import { useAppState } from "../store/AppStore";
 import { ThemeColors, useAppTheme } from "../theme";
 
@@ -21,10 +21,6 @@ export function AnalyticsScreen() {
   const goalProgressItems = useMemo(
     () => data.goals.map((goal) => analytics.goalProgressMap[goal.id]).filter(Boolean),
     [analytics.goalProgressMap, data.goals],
-  );
-  const balanceTrend = useMemo(
-    () => lastNDays(7, today).map((dateKey) => getGoalBalanceScore(data.tasks, data.goals, dateKey)),
-    [data.goals, data.tasks, today],
   );
   const heatmap = useMemo(
     () => lastNDays(30, today).map((dateKey) => getCompletedFocusHours(getTasksForDate(data.tasks, dateKey))),
@@ -48,13 +44,6 @@ export function AnalyticsScreen() {
           trend={trends.streak}
           data={analytics.overallFocusHours}
           color={colors.accent}
-        />
-        <AnalyticsCard
-          title="Goal Balance"
-          value={`${analytics.goalBalanceScore}%`}
-          trend={trends.balance}
-          data={balanceTrend}
-          color={colors.success}
         />
       </View>
 

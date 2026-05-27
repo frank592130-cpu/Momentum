@@ -1,16 +1,17 @@
 import React, { useEffect, useMemo, useRef } from "react";
-import { Animated, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Animated, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
 import { ThemeColors, useAppTheme } from "../theme";
+import { MomentumIcon, MomentumIconName } from "./Icons";
 import { motionCurves, usePressScale } from "./Motion";
 
 export type TabId = "dashboard" | "planner" | "goals" | "analytics" | "settings" | "account";
 
-const TABS: { id: TabId; icon: string; label: string }[] = [
-  { id: "dashboard", icon: "⊞", label: "Today" },
-  { id: "planner", icon: "◫", label: "Planner" },
-  { id: "goals", icon: "◎", label: "Goals" },
-  { id: "analytics", icon: "へ↗", label: "Stats" },
-  { id: "settings", icon: "⚙", label: "Settings" },
+const TABS: { id: TabId; icon: MomentumIconName; label: string }[] = [
+  { id: "dashboard", icon: "today", label: "Today" },
+  { id: "planner", icon: "planner", label: "Planner" },
+  { id: "goals", icon: "goals", label: "Goals" },
+  { id: "analytics", icon: "stats", label: "Stats" },
+  { id: "settings", icon: "settings", label: "Settings" },
 ];
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
@@ -33,6 +34,7 @@ export const BottomNav = React.memo(function BottomNav({ activeTab, onTabPress }
             tab={tab}
             active={active}
             styles={styles}
+            colors={colors}
             onPress={() => onTabPress(tab.id)}
           />
         );
@@ -45,11 +47,13 @@ function NavTab({
   tab,
   active,
   styles,
+  colors,
   onPress,
 }: {
-  tab: { id: TabId; icon: string; label: string };
+  tab: { id: TabId; icon: MomentumIconName; label: string };
   active: boolean;
   styles: ReturnType<typeof createStyles>;
+  colors: ThemeColors;
   onPress: () => void;
 }) {
   const progress = useRef(new Animated.Value(active ? 1 : 0)).current;
@@ -73,25 +77,8 @@ function NavTab({
       activeOpacity={0.8}
     >
       <Animated.View
-        pointerEvents="none"
         style={[
-          styles.activeIndicator,
-          {
-            opacity: progress,
-            transform: [
-              {
-                scale: progress.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.55, 1],
-                }),
-              },
-            ],
-          },
-        ]}
-      />
-      <Animated.Text
-        style={[
-          styles.icon,
+          styles.iconWrap,
           active ? styles.iconActive : styles.iconInactive,
           {
             transform: [
@@ -105,8 +92,13 @@ function NavTab({
           },
         ]}
       >
-        {tab.icon}
-      </Animated.Text>
+        <MomentumIcon
+          name={tab.icon}
+          size={24}
+          color={active ? colors.accent : colors.textSecondary}
+          strokeWidth={active ? 2.8 : 2.35}
+        />
+      </Animated.View>
       <Animated.Text style={[styles.label, active ? styles.labelActive : styles.labelInactive]}>
         {tab.label}
       </Animated.Text>
@@ -142,22 +134,16 @@ function createStyles(colors: ThemeColors, spacingValue: typeof import("../theme
       paddingVertical: 6,
       position: "relative",
     },
-    activeIndicator: {
-      position: "absolute",
-      
-    },
-    
-    icon: {
-      fontSize: 22,
-      lineHeight: 22,
-      fontWeight: "800",
+    iconWrap: {
+      width: 28,
+      height: 24,
+      alignItems: "center",
+      justifyContent: "center",
     },
     iconActive: {
-      color: colors.accent,
       opacity: 1,
     },
     iconInactive: {
-      color: colors.textSecondary,
       opacity: 1,
     },
     label: {

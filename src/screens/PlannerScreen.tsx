@@ -12,6 +12,7 @@ import {
   getTotalDurationHours,
 } from "../domain/stats";
 import { Task } from "../domain/models";
+import { useDeferredModalContent } from "../hooks/useDeferredModalContent";
 import { useAppActions, useAppState } from "../store/AppStore";
 import { ThemeColors, useAppTheme } from "../theme";
 
@@ -19,7 +20,7 @@ type FilterId = "all" | "open" | "done";
 
 const TAGS = ["Focus", "Work", "Meeting", "Health", "Learning"];
 const HOURS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0"));
-const MINUTES = ["00", "15", "30", "45"];
+const MINUTES = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0"));
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
 export function PlannerScreen() {
@@ -339,6 +340,11 @@ function TaskEditorModal({
 }) {
   const { colors, spacing, radius } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, spacing, radius), [colors, spacing, radius]);
+  const contentReady = useDeferredModalContent(visible);
+  const isEditing = title === "Edit Task";
+
+  if (!visible) return null;
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
@@ -357,32 +363,38 @@ function TaskEditorModal({
               placeholderTextColor={colors.textTertiary}
               style={styles.input}
             />
-            <TimePeriodWheel
-              startTime={draft.time}
-              endTime={draft.endTime}
-              onChange={(time, endTime) => onChange((prev) => ({ ...prev, time, endTime }))}
-            />
-            <TagSelector
-              options={tagOptions}
-              value={draft.tag}
-              onChange={(tag) => onChange((prev) => ({ ...prev, tag }))}
-            />
-            <MultiGoalSelector
-              goals={goals}
-              value={draft.goalIds}
-              onChange={(goalIds) => onChange((prev) => ({ ...prev, goalIds }))}
-            />
-            {error ? <Text style={styles.formError}>{error}</Text> : null}
-            <View style={styles.modalActions}>
-              {onDelete ? (
-                <TouchableOpacity style={styles.deleteButton} onPress={onDelete} activeOpacity={0.8}>
-                  <Text style={styles.deleteButtonText}>Delete</Text>
-                </TouchableOpacity>
-              ) : null}
-              <TouchableOpacity style={styles.saveButton} onPress={onSave} activeOpacity={0.8}>
-                <Text style={styles.addButtonText}>{title === "Edit Task" ? "Save" : "Add Task"}</Text>
-              </TouchableOpacity>
-            </View>
+            {contentReady ? (
+              <>
+                <TimePeriodWheel
+                  startTime={draft.time}
+                  endTime={draft.endTime}
+                  onChange={(time, endTime) => onChange((prev) => ({ ...prev, time, endTime }))}
+                />
+                <TagSelector
+                  options={tagOptions}
+                  value={draft.tag}
+                  onChange={(tag) => onChange((prev) => ({ ...prev, tag }))}
+                />
+                <MultiGoalSelector
+                  goals={goals}
+                  value={draft.goalIds}
+                  onChange={(goalIds) => onChange((prev) => ({ ...prev, goalIds }))}
+                />
+                {error ? <Text style={styles.formError}>{error}</Text> : null}
+                <View style={styles.modalActions}>
+                  {onDelete ? (
+                    <TouchableOpacity style={styles.deleteButton} onPress={onDelete} activeOpacity={0.8}>
+                      <Text style={styles.deleteButtonText}>Delete</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  <TouchableOpacity style={styles.saveButton} onPress={onSave} activeOpacity={0.8}>
+                    <Text style={styles.addButtonText}>{isEditing ? "Save" : "Add Task"}</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <View style={styles.modalWarmup} />
+            )}
           </ScrollView>
         </MotionPanel>
       </View>
@@ -447,11 +459,11 @@ function TimePairPicker({
   return (
     <View style={styles.timePair}>
       <View pointerEvents="none" style={styles.wheelSelectionBand} />
-      <WheelColumn values={HOURS} value={hour} onChange={onHourChange} />
+      <WheelColumn values={HOURS} value={hour} onChange={onHourChange} loop />
       <View style={styles.timeColonWrap}>
         <Text style={styles.timeColon}>:</Text>
       </View>
-      <WheelColumn values={MINUTES} value={minute} onChange={onMinuteChange} />
+      <WheelColumn values={MINUTES} value={minute} onChange={onMinuteChange} loop />
     </View>
   );
 }
@@ -737,6 +749,7 @@ function createStyles(colors: ThemeColors, spacingValue: typeof import("../theme
       overflow: "hidden",
     },
     modalContent: { padding: spacingValue.xl, gap: spacingValue.md, paddingBottom: spacingValue.xxl },
+    modalWarmup: { minHeight: 210 },
     modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacingValue.md },
     modalTitle: { color: colors.textPrimary, fontSize: 24, fontWeight: "800", letterSpacing: -0.4 },
     modalCloseButton: {

@@ -1,4 +1,4 @@
-import { addDays, dateRange, diffInDays, lastNDays, toDateKey } from "./date";
+import { addDays, dateRange, diffInDays, lastNDays, parseDateKey, toDateKey } from "./date";
 import {
   AnalyticsData,
   AnalyticsInsight,
@@ -203,6 +203,29 @@ export function getStreakDays(tasks: Task[], todayKey: string) {
   return streak;
 }
 
+function getMondayOfWeek(dateKey: string) {
+  const date = parseDateKey(dateKey);
+  const weekday = date.getDay();
+  const daysFromMonday = weekday === 0 ? 6 : weekday - 1;
+  date.setDate(date.getDate() - daysFromMonday);
+  return toDateKey(date);
+}
+
+function getMomentumDaysInRange(tasks: Task[], startDateKey: string, endDateKey: string) {
+  return getActiveDays(tasks, dateRange(startDateKey, endDateKey));
+}
+
+export function getWeeklyMomentumStreakComparison(tasks: Task[], todayKey = toDateKey()) {
+  const thisWeekStart = getMondayOfWeek(todayKey);
+  const lastWeekStart = addDays(thisWeekStart, -7);
+  const lastWeekEnd = addDays(thisWeekStart, -1);
+
+  return {
+    thisWeek: getMomentumDaysInRange(tasks, thisWeekStart, todayKey),
+    lastWeek: getMomentumDaysInRange(tasks, lastWeekStart, lastWeekEnd),
+  };
+}
+
 function getGoalCompletedHoursForDate(goalTasks: Task[], dateKey: string) {
   return getCompletedFocusHours(getTasksForDate(goalTasks, dateKey));
 }
@@ -321,7 +344,6 @@ export function generateAnalyticsInsights(
   tasks: Task[],
   goals: Goal[],
   goalProgressMap: Record<string, GoalProgress>,
-  goalBalanceScore: number,
   totalStreakDays: number,
   todayKey = toDateKey(),
 ): AnalyticsInsight[] {
@@ -343,24 +365,6 @@ export function generateAnalyticsInsights(
       body: capacity.message,
       icon: "📈",
       severity: "neutral",
-    });
-  }
-
-  if (goalBalanceScore < 40) {
-    insights.push({
-      type: "balance",
-      title: "⚖️ Unbalanced Effort",
-      body: "Your work is concentrated on a few goals. Try diversifying your focus.",
-      icon: "⚖️",
-      severity: "warning",
-    });
-  } else if (goalBalanceScore >= 75) {
-    insights.push({
-      type: "balance",
-      title: "✨ Well-Balanced Week",
-      body: "Great job distributing effort evenly across goals!",
-      icon: "✨",
-      severity: "positive",
     });
   }
 
@@ -432,7 +436,7 @@ export function getAnalyticsData(goals: Goal[], tasks: Task[], todayKey = toDate
     goalProgressMap,
     overallWeeklyCompletion,
     overallFocusHours,
-    insights: generateAnalyticsInsights(tasks, goals, goalProgressMap, goalBalanceScore, totalStreakDays, todayKey),
+    insights: generateAnalyticsInsights(tasks, goals, goalProgressMap, totalStreakDays, todayKey),
     activeDays30: getActiveDays(tasks, last30),
     totalStreakDays,
     goalBalanceScore,
@@ -442,9 +446,10 @@ export function getAnalyticsData(goals: Goal[], tasks: Task[], todayKey = toDate
 export function getAnalyticsTrends(goals: Goal[], tasks: Task[], todayKey = toDateKey()) {
   const current = getAnalyticsData(goals, tasks, todayKey);
   const previous = getAnalyticsData(goals, tasks, addDays(todayKey, -7));
+  const weeklyMomentum = getWeeklyMomentumStreakComparison(tasks, todayKey);
 
   const balanceVal = getTrendPercent(current.goalBalanceScore, previous.goalBalanceScore);
-  const streakVal = getTrendPercent(current.totalStreakDays, previous.totalStreakDays);
+  const streakVal = getTrendPercent(weeklyMomentum.thisWeek, weeklyMomentum.lastWeek);
   const completionVal = getTrendPercent(
     getAverage(current.overallWeeklyCompletion),
     getAverage(previous.overallWeeklyCompletion)

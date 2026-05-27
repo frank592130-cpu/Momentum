@@ -332,11 +332,13 @@ function DailyTargetSelector({ value, onChange }: { value: number; onChange: (va
           values={TARGET_HOURS}
           value={hourString}
           onChange={(next) => onChange(Number(next) + Number(closestMin) / 60)}
+          loop
         />
         <WheelColumn
           values={TARGET_MINUTES}
           value={closestMin}
           onChange={(next) => onChange(Number(hourString) + Number(next) / 60)}
+          loop
         />
       </View>
     </View>
@@ -460,9 +462,9 @@ function DateWheelLine({ label, value, onChange }: { label: string; value: strin
       <Text style={typography.micro}>{label}</Text>
       <View style={styles.dateCompactRow}>
         <View pointerEvents="none" style={styles.wheelSelectionBand} />
-        <WheelColumn values={DATE_DAYS} value={day} onChange={(nextDay) => update(nextDay, month, year)} />
-        <WheelColumn values={MONTHS} value={month} onChange={(nextMonth) => update(day, nextMonth, year)} />
-        <WheelColumn values={YEARS} value={year} onChange={(nextYear) => update(day, month, nextYear)} />
+        <WheelColumn values={DATE_DAYS} value={day} onChange={(nextDay) => update(nextDay, month, year)} loop />
+        <WheelColumn values={MONTHS} value={month} onChange={(nextMonth) => update(day, nextMonth, year)} loop />
+        <WheelColumn values={YEARS} value={year} onChange={(nextYear) => update(day, month, nextYear)} loop />
       </View>
     </View>
   );

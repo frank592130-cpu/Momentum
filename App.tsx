@@ -5,7 +5,6 @@ import { AnimatedBackground } from "./src/components/AnimatedBackground";
 import { LoadingState } from "./src/components/Base";
 import { BottomNav, TabId } from "./src/components/BottomNav";
 import { MotionBanner, MotionScreen } from "./src/components/Motion";
-import { ProfileButton } from "./src/components/ProfileButton";
 import { GoalMetrics } from "./src/domain/models";
 import { AnalyticsScreen } from "./src/screens/AnalyticsScreen";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
@@ -28,22 +27,19 @@ function AppContent() {
 
 function MomentumApp() {
   const insets = useSafeAreaInsets();
-  const { colors, spacing, radius, mode, typography } = useAppTheme();
+  const { colors, spacing, radius, mode } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, spacing, radius), [colors, spacing, radius]);
   const { isReady, error, toast } = useAppState();
   const actions = useAppActions();
   const [activeTab, setActiveTab] = useState<TabId>("dashboard");
   const [activeGoalId, setActiveGoalId] = useState<string | undefined>();
   const [showGoalDetail, setShowGoalDetail] = useState(false);
+  const [settingsSubRouteActive, setSettingsSubRouteActive] = useState(false);
 
   const handleTabPress = useCallback((id: TabId) => {
     setActiveTab(id);
     if (id !== "goals") setShowGoalDetail(false);
-  }, []);
-
-  const handleProfileNavigate = useCallback((tab: string) => {
-    setActiveTab(tab as TabId);
-    setShowGoalDetail(false);
+    if (id !== "settings") setSettingsSubRouteActive(false);
   }, []);
 
   const handleGoalPress = useCallback((goal: GoalMetrics) => {
@@ -69,7 +65,7 @@ function MomentumApp() {
       case "analytics":
         return <AnalyticsScreen />;
       case "settings":
-        return <SettingsScreen />;
+        return <SettingsScreen onNavigate={handleTabPress} onSubRouteChange={setSettingsSubRouteActive} />;
       case "account":
         return <AccountScreen onBack={() => setActiveTab("dashboard")} />;
       default:
@@ -86,11 +82,6 @@ function MomentumApp() {
       <View style={{ flex: 1, paddingTop: insets.top }}>
         <StatusBar barStyle={mode === "dark" ? "light-content" : "dark-content"} translucent backgroundColor="transparent" />
         
-        {activeTab !== "account" && (
-          <View style={styles.profileButtonWrap}>
-            <ProfileButton onNavigate={handleProfileNavigate} />
-          </View>
-        )}
 
         <View style={styles.content}>
           <MotionScreen motionKey={screenMotionKey}>{renderScreen()}</MotionScreen>
@@ -118,7 +109,7 @@ function MomentumApp() {
           </MotionBanner>
         ) : null}
 
-        {activeTab !== "account" && (
+        {activeTab !== "account" && !(activeTab === "settings" && settingsSubRouteActive) && (
           <View style={[styles.navWrap, { bottom: insets.bottom }]}>
             <BottomNav activeTab={activeTab} onTabPress={handleTabPress} />
           </View>
@@ -146,13 +137,6 @@ function createStyles(colors: ThemeColors, spacingValue: typeof import("./src/th
     },
     content: {
       flex: 1,
-    },
-    profileButtonWrap: {
-      position: "absolute",
-      top: 0,
-      right: spacingValue.xl,
-      paddingTop: 40,
-      zIndex: 50,
     },
     navWrap: {
       position: "absolute",

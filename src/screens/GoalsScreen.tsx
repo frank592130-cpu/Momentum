@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from "react";
 import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { EmptyState, RiskBadge, SectionHeader } from "../components/Base";
+import { EmptyState, RiskBadge } from "../components/Base";
 import { ProgressRing } from "../components/Charts";
 import { MotionPanel } from "../components/Motion";
 import { WHEEL_HEIGHT, WHEEL_ITEM_HEIGHT, WheelColumn } from "../components/WheelPicker";
-import { addDays, formatDateLabel, toDateKey } from "../domain/date";
+import { addDays, toDateKey } from "../domain/date";
 import { GoalMetrics } from "../domain/models";
-import { enrichGoals, getAnalyticsData } from "../domain/stats";
+import { enrichGoals } from "../domain/stats";
+import { useDeferredModalContent } from "../hooks/useDeferredModalContent";
 import { useAppActions, useAppState } from "../store/AppStore";
 import { ThemeColors, useAppTheme } from "../theme";
 
@@ -36,10 +37,6 @@ export function GoalsScreen({ onGoalPress }: Props) {
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [editingGoalId, setEditingGoalId] = useState<string | undefined>();
 
-  const analyticsData = useMemo(() => getAnalyticsData(data.goals, data.tasks, today), [data.goals, data.tasks, today]);
-  const overallBalance = analyticsData.goalBalanceScore;
-  const onTrack = goals.filter((goal) => goal.risk === "low").length;
-  const atRisk = goals.filter((goal) => goal.risk === "high").length;
   const categoryOptions = useMemo(() => {
     const categories = data.goals.map((goal) => goal.category).filter(Boolean);
     return Array.from(new Set(["Personal", "Work", "Health", "Learning", ...categories]));
@@ -85,27 +82,6 @@ export function GoalsScreen({ onGoalPress }: Props) {
       <View>
         <Text style={[typography.label, styles.label]}>Goal Tracker</Text>
         <Text style={styles.title}>Active Goals</Text>
-      </View>
-
-      <View style={styles.summaryCard}>
-        <ProgressRing size={88} progress={overallBalance} color={colors.accent} strokeWidth={7}>
-          <Text style={styles.ringVal}>{overallBalance}%</Text>
-        </ProgressRing>
-        <View style={styles.ringRight}>
-          <Text style={typography.titleSmall}>Overall Goal Balance</Text>
-          <View style={styles.statsRow}>
-            <Metric label="On Track" value={`${onTrack}`} color={colors.success} />
-            <View style={styles.statDivider} />
-            <Metric label="At Risk" value={`${atRisk}`} color={colors.danger} />
-            <View style={styles.statDivider} />
-            <Metric label="Tasks" value={`${data.tasks.length}`} color={colors.accent} />
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.goalActionRow}>
-        
-        
       </View>
 
       <View>
@@ -203,6 +179,11 @@ function GoalEditorModal({
 }) {
   const { colors, spacing, radius } = useAppTheme();
   const styles = useMemo(() => createStyles(colors, spacing, radius), [colors, spacing, radius]);
+  const contentReady = useDeferredModalContent(visible);
+  const isEditing = title === "Edit Goal";
+
+  if (!visible) return null;
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
@@ -221,31 +202,37 @@ function GoalEditorModal({
               placeholderTextColor={colors.textTertiary}
               style={styles.input}
             />
-            <CategorySelector
-              options={categoryOptions}
-              value={draft.category}
-              onChange={(category) => onChange((prev) => ({ ...prev, category }))}
-            />
-            <DailyTargetSelector
-              value={draft.dailyGoalHours}
-              onChange={(dailyGoalHours) => onChange((prev) => ({ ...prev, dailyGoalHours }))}
-            />
-            <DatePeriodWheel
-              startDate={draft.startDate}
-              endDate={draft.deadline}
-              onChange={(startDate, deadline) => onChange((prev) => ({ ...prev, startDate, deadline }))}
-            />
-            {error ? <Text style={styles.formError}>{error}</Text> : null}
-            <View style={styles.modalActions}>
-              {onDelete ? (
-                <TouchableOpacity style={styles.deleteButton} onPress={onDelete} activeOpacity={0.8}>
-                  <Text style={styles.deleteButtonText}>Delete</Text>
-                </TouchableOpacity>
-              ) : null}
-              <TouchableOpacity style={styles.saveButton} onPress={onSave} activeOpacity={0.8}>
-                <Text style={styles.addButtonText}>{title === "Edit Goal" ? "Save" : "Add Goal"}</Text>
-              </TouchableOpacity>
-            </View>
+            {contentReady ? (
+              <>
+                <CategorySelector
+                  options={categoryOptions}
+                  value={draft.category}
+                  onChange={(category) => onChange((prev) => ({ ...prev, category }))}
+                />
+                <DailyTargetSelector
+                  value={draft.dailyGoalHours}
+                  onChange={(dailyGoalHours) => onChange((prev) => ({ ...prev, dailyGoalHours }))}
+                />
+                <DatePeriodWheel
+                  startDate={draft.startDate}
+                  endDate={draft.deadline}
+                  onChange={(startDate, deadline) => onChange((prev) => ({ ...prev, startDate, deadline }))}
+                />
+                {error ? <Text style={styles.formError}>{error}</Text> : null}
+                <View style={styles.modalActions}>
+                  {onDelete ? (
+                    <TouchableOpacity style={styles.deleteButton} onPress={onDelete} activeOpacity={0.8}>
+                      <Text style={styles.deleteButtonText}>Delete</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  <TouchableOpacity style={styles.saveButton} onPress={onSave} activeOpacity={0.8}>
+                    <Text style={styles.addButtonText}>{isEditing ? "Save" : "Add Goal"}</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <View style={styles.modalWarmup} />
+            )}
           </ScrollView>
         </MotionPanel>
       </View>
@@ -282,11 +269,13 @@ function DailyTargetSelector({ value, onChange }: { value: number; onChange: (va
           values={TARGET_HOURS}
           value={hourString}
           onChange={(next) => onChange(Number(next) + Number(closestMin) / 60)}
+          loop
         />
         <WheelColumn
           values={TARGET_MINUTES}
           value={closestMin}
           onChange={(next) => onChange(Number(hourString) + Number(next) / 60)}
+          loop
         />
       </View>
     </View>
@@ -320,20 +309,10 @@ function DateWheelLine({
       <Text style={typography.micro}>{label}</Text>
       <View style={styles.dateCompactRow}>
         <View pointerEvents="none" style={styles.wheelSelectionBand} />
-        <WheelColumn values={DAYS} value={day} onChange={(nextDay) => update(nextDay, month, year)} />
-        <WheelColumn values={MONTHS} value={month} onChange={(nextMonth) => update(day, nextMonth, year)} />
-        <WheelColumn values={YEARS} value={year} onChange={(nextYear) => update(day, month, nextYear)} />
+        <WheelColumn values={DAYS} value={day} onChange={(nextDay) => update(nextDay, month, year)} loop />
+        <WheelColumn values={MONTHS} value={month} onChange={(nextMonth) => update(day, nextMonth, year)} loop />
+        <WheelColumn values={YEARS} value={year} onChange={(nextYear) => update(day, month, nextYear)} loop />
       </View>
-    </View>
-  );
-}
-
-function Metric({ label, value, color }: { label: string; value: string; color: string }) {
-  const { typography } = useAppTheme();
-  return (
-    <View style={{ flex: 1, alignItems: "center" }}>
-      <Text style={typography.micro}>{label}</Text>
-      <Text style={{ fontSize: 20, fontWeight: "800", letterSpacing: -0.5, color }}>{value}</Text>
     </View>
   );
 }
@@ -387,47 +366,32 @@ function CategorySelector({
             </TouchableOpacity>
           );
         })}
-        <TouchableOpacity
-          onPress={() => setIsAddingCustom(true)}
-          style={[styles.addCategoryButton, isAddingCustom && styles.addCategoryButtonActive]}
-          activeOpacity={0.75}
-          accessibilityLabel="Add custom category"
-        >
-          <Text style={styles.addCategoryButtonText}>+</Text>
-        </TouchableOpacity>
+        {!isAddingCustom ? (
+          <TouchableOpacity
+            onPress={() => setIsAddingCustom(true)}
+            style={styles.addCategoryButton}
+            activeOpacity={0.75}
+            accessibilityLabel="Add custom category"
+          >
+            <Text style={styles.addCategoryButtonText}>+</Text>
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
       {isAddingCustom ? (
-        <View style={styles.customCategoryRow}>
-          <TextInput
-            value={customCategory}
-            onChangeText={setCustomCategory}
-            onSubmitEditing={commitCustomCategory}
-            placeholder="New category"
-            placeholderTextColor={colors.textTertiary}
-            style={[styles.input, styles.customCategoryInput]}
-            autoFocus
-            returnKeyType="done"
-          />
-          <TouchableOpacity
-            onPress={commitCustomCategory}
-            style={[styles.customCategoryActionButton, styles.customCategoryConfirmButton]}
-            activeOpacity={0.75}
-            accessibilityLabel="Save custom category"
-          >
-            <Text style={[styles.customCategoryActionText, styles.customCategoryConfirmText]}>+</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => {
-              setCustomCategory("");
-              setIsAddingCustom(false);
-            }}
-            style={styles.customCategoryActionButton}
-            activeOpacity={0.75}
-            accessibilityLabel="Cancel custom category"
-          >
-            <Text style={styles.customCategoryActionText}>x</Text>
-          </TouchableOpacity>
-        </View>
+        <TextInput
+          value={customCategory}
+          onChangeText={setCustomCategory}
+          onSubmitEditing={commitCustomCategory}
+          onBlur={() => {
+            if (customCategory.trim()) commitCustomCategory();
+            else setIsAddingCustom(false);
+          }}
+          placeholder="New category"
+          placeholderTextColor={colors.textTertiary}
+          style={[styles.input, styles.customCategoryInput]}
+          autoFocus
+          returnKeyType="done"
+        />
       ) : null}
     </View>
   );
@@ -497,22 +461,6 @@ function createStyles(colors: ThemeColors, spacingValue: typeof import("../theme
     container: { padding: spacingValue.xl, paddingTop: spacingValue.sm, gap: spacingValue.xxl, paddingBottom: 130 },
     label: { marginBottom: 5, paddingTop: 15 },
     title: { fontSize: 35, fontWeight: "800", color: colors.textPrimary, letterSpacing: -0.6 },
-    summaryCard: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacingValue.xl,
-      backgroundColor: colors.bgCard,
-      borderWidth: 1,
-      borderColor: colors.accentGlow,
-      borderRadius: radiusValue.lg,
-      padding: spacingValue.xl,
-    },
-    goalActionRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: spacingValue.md,
-    },
     actionLabel: { marginBottom: 4 },
     actionTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: "800" },
     plusGoalButton: {
@@ -525,10 +473,6 @@ function createStyles(colors: ThemeColors, spacingValue: typeof import("../theme
       paddingHorizontal: spacingValue.lg,
     },
     plusGoalText: { color: "#FFFFFF", fontSize: 13, fontWeight: "800" },
-    ringVal: { fontSize: 18, fontWeight: "800", color: colors.textPrimary },
-    ringRight: { flex: 1, gap: spacingValue.md },
-    statsRow: { flexDirection: "row", alignItems: "center" },
-    statDivider: { width: 1, height: 28, backgroundColor: colors.border },
     formCard: {
       backgroundColor: colors.bgCard,
       borderWidth: 1,
@@ -552,6 +496,7 @@ function createStyles(colors: ThemeColors, spacingValue: typeof import("../theme
       overflow: "hidden",
     },
     modalContent: { padding: spacingValue.xl, gap: spacingValue.md, paddingBottom: spacingValue.xxl },
+    modalWarmup: { minHeight: 260 },
     modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacingValue.md },
     modalTitle: { color: colors.textPrimary, fontSize: 24, fontWeight: "800", letterSpacing: -0.4 },
     modalCloseButton: {
@@ -624,34 +569,12 @@ function createStyles(colors: ThemeColors, spacingValue: typeof import("../theme
       borderColor: colors.border,
       backgroundColor: colors.bgElevated,
     },
-    addCategoryButtonActive: {
-      borderColor: colors.accent,
-      backgroundColor: colors.accentSubtle,
-    },
     addCategoryButtonText: { color: colors.accent, fontSize: 20, fontWeight: "800", lineHeight: 20 },
-    customCategoryRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacingValue.sm,
+    customCategoryInput: {
       marginTop: spacingValue.sm,
-    },
-    customCategoryInput: { flex: 1 },
-    customCategoryActionButton: {
-      width: 42,
-      minHeight: 42,
-      alignItems: "center",
-      justifyContent: "center",
-      borderRadius: radiusValue.md,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.bgElevated,
-    },
-    customCategoryConfirmButton: {
       borderColor: colors.accent,
       backgroundColor: colors.accentSubtle,
     },
-    customCategoryActionText: { color: colors.textSecondary, fontSize: 16, fontWeight: "800", lineHeight: 18 },
-    customCategoryConfirmText: { color: colors.accent, fontSize: 20, lineHeight: 20 },
     dateWheelPanel: {
       gap: spacingValue.md,
       borderWidth: 1,

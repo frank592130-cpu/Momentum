@@ -6,7 +6,7 @@ export type RiskLevel = "low" | "medium" | "high";
 export type ThemePreference = "system" | "light" | "dark";
 export type GoalProgressSource = "manual" | "tasks";
 export type AnalyticsInsightSeverity = "positive" | "neutral" | "warning";
-export type AnalyticsInsightType = "capacity" | "balance" | "streak" | "velocity";
+export type AnalyticsInsightType = "capacity" | "streak" | "velocity";
 
 export interface Goal {
   id: string;
